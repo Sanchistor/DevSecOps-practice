@@ -16,11 +16,17 @@ pipeline {
         stage('Terraform Init & Plan') {
             steps {
                 script {
-                    withAWS(credentials: AWS_CREDENTIALS) {
-                        // Ensure Terraform commands can access AWS resources
-                        sh 'cd terraform'
-                        sh 'terraform init'
-                        sh 'terraform plan'
+                    // Retrieve AWS credentials and export them as environment variables
+                    withCredentials([usernamePassword(credentialsId: AWS_CREDENTIALS, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                        // Set AWS region
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            cd terraform
+                            terraform init
+                            terraform plan
+                        '''
                     }
                 }
             }
@@ -29,8 +35,15 @@ pipeline {
         stage('Terraform Apply - Deploy AWS Resources') {
             steps {
                 script {
-                    withAWS(credentials: AWS_CREDENTIALS) {
-                        sh 'terraform apply -auto-approve'
+                    // Retrieve AWS credentials and export them as environment variables
+                    withCredentials([usernamePassword(credentialsId: AWS_CREDENTIALS, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                        // Set AWS region and apply Terraform
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            terraform apply -auto-approve
+                        '''
                     }
                 }
             }
@@ -45,8 +58,15 @@ pipeline {
         stage('Terraform Destroy - Clean Up AWS Resources') {
             steps {
                 script {
-                    withAWS(credentials: AWS_CREDENTIALS) {
-                        sh 'terraform destroy -auto-approve'
+                    // Retrieve AWS credentials and export them as environment variables
+                    withCredentials([usernamePassword(credentialsId: AWS_CREDENTIALS, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                        // Set AWS region and destroy resources
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            terraform destroy -auto-approve
+                        '''
                     }
                 }
             }
