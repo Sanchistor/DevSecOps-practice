@@ -15,8 +15,8 @@ This repository provides a **practical DevSecOps solution** integrating **Jenkin
 ## Getting Started
 ### **1. Clone the Repository**
 ```sh
-git clone https://github.com/your-repo/devsecops-practice.git
-cd devsecops-practice
+git clone https://github.com/Sanchistor/DevSecOps-practice.git
+cd DevSecOps-practice
 ```
 
 ### **2. Setup AWS Credentials**
