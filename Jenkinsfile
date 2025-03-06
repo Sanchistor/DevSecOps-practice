@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         AWS_REGION = 'eu-west-1'
-        AWS_CREDENTIALS = credentials('aws-credentials')  // Use stored AWS credentials
+        AWS_CREDENTIALS = 'aws-credentials'  // ID of your AWS credentials stored in Jenkins
     }
 
     stages {
@@ -16,9 +16,12 @@ pipeline {
         stage('Terraform Init & Plan') {
             steps {
                 script {
-                    sh 'cd terraform'
-                    sh 'terraform init'
-                    sh 'terraform plan'
+                    withAWS(credentials: AWS_CREDENTIALS) {
+                        // Ensure Terraform commands can access AWS resources
+                        sh 'cd terraform'
+                        sh 'terraform init'
+                        sh 'terraform plan'
+                    }
                 }
             }
         }
@@ -26,7 +29,9 @@ pipeline {
         stage('Terraform Apply - Deploy AWS Resources') {
             steps {
                 script {
-                    sh 'terraform apply -auto-approve'
+                    withAWS(credentials: AWS_CREDENTIALS) {
+                        sh 'terraform apply -auto-approve'
+                    }
                 }
             }
         }
@@ -40,7 +45,9 @@ pipeline {
         stage('Terraform Destroy - Clean Up AWS Resources') {
             steps {
                 script {
-                    sh 'terraform destroy -auto-approve'
+                    withAWS(credentials: AWS_CREDENTIALS) {
+                        sh 'terraform destroy -auto-approve'
+                    }
                 }
             }
         }
