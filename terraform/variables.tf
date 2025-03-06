@@ -15,7 +15,7 @@ variable "app_name" {
 // Database Config
 variable "database_name"{
     type = string
-    default = "my-app"
+    default = "myappdb"
 }
 
 variable "db-username" {
