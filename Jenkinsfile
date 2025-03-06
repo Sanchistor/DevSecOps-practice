@@ -38,8 +38,7 @@ pipeline {
                             export AWS_REGION=$AWS_REGION
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            pwd
-                            ls -al
+                            cd terraform
                             terraform apply -auto-approve
                         '''
                     }
@@ -61,6 +60,7 @@ pipeline {
                             export AWS_REGION=$AWS_REGION
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            cd terraform
                             terraform destroy -auto-approve
                         '''
                     }
