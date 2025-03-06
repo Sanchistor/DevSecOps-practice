@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         AWS_REGION = 'eu-west-1'
-        AWS_CREDENTIALS = 'aws-credentials'  // ID of your AWS credentials stored in Jenkins
     }
 
     stages {
@@ -16,9 +15,7 @@ pipeline {
         stage('Terraform Init & Plan') {
             steps {
                 script {
-                    // Retrieve AWS credentials and export them as environment variables
-                    withCredentials([usernamePassword(credentialsId: AWS_CREDENTIALS, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                        // Set AWS region
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
                             export AWS_REGION=$AWS_REGION
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
@@ -35,9 +32,7 @@ pipeline {
         stage('Terraform Apply - Deploy AWS Resources') {
             steps {
                 script {
-                    // Retrieve AWS credentials and export them as environment variables
-                    withCredentials([usernamePassword(credentialsId: AWS_CREDENTIALS, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                        // Set AWS region and apply Terraform
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
                             export AWS_REGION=$AWS_REGION
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
@@ -58,9 +53,7 @@ pipeline {
         stage('Terraform Destroy - Clean Up AWS Resources') {
             steps {
                 script {
-                    // Retrieve AWS credentials and export them as environment variables
-                    withCredentials([usernamePassword(credentialsId: AWS_CREDENTIALS, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                        // Set AWS region and destroy resources
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
                             export AWS_REGION=$AWS_REGION
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
