@@ -74,7 +74,18 @@ pipeline {
             echo 'Pipeline execution completed successfully!'
         }
         failure {
-            echo 'Pipeline failed. Check logs!'
+            echo 'Pipeline failed. Attempting to clean up resources...'
+            script {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                    sh '''
+                        export AWS_REGION=$AWS_REGION
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        cd terraform
+                        terraform destroy -auto-approve || true
+                    '''
+                }
+            }
         }
     }
 }
