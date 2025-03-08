@@ -11,14 +11,6 @@ resource "aws_security_group" "eks_control_plane_sg" {
     security_groups = [aws_security_group.eks_worker_node_sg.id]
   }
 
-  # Allow worker nodes to communicate with the control plane on kubelet API (port 10250)
-  ingress {
-    from_port   = 10250
-    to_port     = 10250
-    protocol    = "tcp"
-    security_groups = [aws_security_group.eks_worker_node_sg.id]
-  }
-
   # Allow outbound traffic to worker nodes
   egress {
     from_port   = 0
@@ -28,12 +20,13 @@ resource "aws_security_group" "eks_control_plane_sg" {
   }
 }
 
+
 resource "aws_security_group" "eks_worker_node_sg" {
   name        = "${var.cluster_name}-worker-node"
   description = "Security group for worker nodes"
   vpc_id      = data.aws_vpc.default.id
 
-  # Allow worker nodes to receive communication from the control plane
+  # Allow worker nodes to receive communication from the control plane (port 10250)
   ingress {
     from_port   = 10250
     to_port     = 10250
@@ -41,21 +34,13 @@ resource "aws_security_group" "eks_worker_node_sg" {
     security_groups = [aws_security_group.eks_control_plane_sg.id]
   }
 
-  # Allow nodes to communicate with each other
+  # ✅ Allow nodes to communicate with each other using `self`
   ingress {
     from_port   = 0
     to_port     = 65535
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    self        = true
   }
-
-#   # Allow worker nodes to communicate with RDS
-#   ingress {
-#     from_port   = 3306
-#     to_port     = 3306
-#     protocol    = "tcp"
-#     security_groups = [aws_security_group.rds_sg.id]
-#   }
 
   # Allow all outbound traffic
   egress {
@@ -65,3 +50,4 @@ resource "aws_security_group" "eks_worker_node_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
