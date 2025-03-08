@@ -4,7 +4,7 @@ data "aws_vpc" "default" {
 
 resource "aws_security_group" "rds" {
   vpc_id      = data.aws_vpc.default.id
-  name_prefix = "rds-sg"
+  name = "rds-sg"
   ingress {
     from_port   = 5432
     to_port     = 5432

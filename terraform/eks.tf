@@ -1,44 +1,29 @@
-# module "eks" {
-#   source  = "terraform-aws-modules/eks/aws"
-#   version = "20.29.0"
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.31"
 
-#   cluster_name    = var.cluster_name
-#   cluster_version = "1.31"
+  cluster_name    = var.cluster_name
+  cluster_version = "1.31"
 
-#   cluster_endpoint_public_access           = false
-#   enable_cluster_creator_admin_permissions = true
+  vpc_id     = data.aws_vpc.default.id
+  subnet_ids = data.aws_subnets.default.ids
 
-#   vpc_id                    = var.vpc_id
-#   subnet_ids                = var.subnet_id
-#   cluster_security_group_id = aws_security_group.eks_control_plane_sg.id
+  cluster_endpoint_public_access = true
+  enable_cluster_creator_admin_permissions = true
 
-#   eks_managed_node_group_defaults = {
-#     ami_type            = var.ami_type
-#     node_role_arn       = var.iam_role_arn
-#     node_security_group = aws_security_group.eks_worker_node_sg.id
-#   }
+  cluster_security_group_id = aws_security_group.eks_control_plane_sg.id
 
-#   eks_managed_node_groups = {
-#     one = {
-#       name = "node-group-1"
+  eks_managed_node_groups = {
+    default = {
+      instance_types = ["t3.medium"]
+      min_size       = 1
+      max_size       = 3
+      desired_size   = 2
 
-#       instance_types = ["t2.small"]
-#       ami_id = var.image_id
+      vpc_security_group_ids = [aws_security_group.eks_worker_node_sg.id]
 
-#       min_size     = 1
-#       max_size     = 3
-#       desired_size = 2
-#     }
-
-#     two = {
-#       name = "node-group-2"
-
-#       instance_types = ["t2.small"]
-#       ami_id = var.image_id
-
-#       min_size     = 1
-#       max_size     = 2
-#       desired_size = 1
-#     }
-#   }
-# }
+      # Attach IAM Role to Worker Nodes
+      iam_role_arn = aws_iam_role.worker_node_role.arn
+    }
+  }
+}

@@ -35,26 +35,14 @@ variable "cluster_name" {
   default     = "MYAPP-EKS"
 }
 
-variable "ami_type" {
-  description = "AMI used by EKS"
-  type        = string
-  default     = "CUSTOM"
-}
+# variable "vpc_id" {
+#   description = "VPC used by EKS"
+#   type        = string
+#   default     = "vpc-05af5b6e232a44102"
+# }
 
-variable "image_id" {
-  description = "AMI used by custom ami_type"
-  type        = string
-  default     = "ami-0f87b93b76661f2fb"
-}
-
-variable "vpc_id" {
-  description = "VPC used by EKS"
-  type        = string
-  default     = "vpc-05af5b6e232a44102"
-}
-
-variable "subnet_id" {
-  description = "Subnet used by EKS"
-  type        = string
-  default     = "subnet-0dcaac22cc39d0da7"
-}
+# variable "subnet_id" {
+#   description = "Subnet used by EKS"
+#   type        = string
+#   default     = "subnet-0dcaac22cc39d0da7"
+# }
