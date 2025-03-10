@@ -35,14 +35,18 @@ variable "cluster_name" {
   default     = "MYAPP-EKS"
 }
 
-# variable "vpc_id" {
-#   description = "VPC used by EKS"
-#   type        = string
-#   default     = "vpc-05af5b6e232a44102"
-# }
+variable "subnet_cidrs" {
+  description = "List of subnet CIDR blocks"
+  type        = list(string)
+  default     = [
+    "172.31.16.0/20", # Subnet 1 CIDR block
+    "172.31.32.0/20", # Subnet 2 CIDR block
+    "172.31.0.0/20"  # Subnet 3 CIDR block
+  ]
+}
 
-# variable "subnet_id" {
-#   description = "Subnet used by EKS"
-#   type        = string
-#   default     = "subnet-0dcaac22cc39d0da7"
-# }
+variable "admin_user" {
+    description = "User to access Cluster from AWS console"
+    type = string
+    default = "arn:aws:iam::266735847393:user/admin"
+}

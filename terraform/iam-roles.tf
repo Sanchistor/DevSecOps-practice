@@ -48,3 +48,8 @@ resource "aws_iam_role_policy_attachment" "worker_node_s3_policy" {
   role       = aws_iam_role.worker_node_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
 }
+
+resource "aws_iam_role_policy_attachment" "worker_node_rds_policy" {
+  role       = aws_iam_role.worker_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonRDSFullAccess"  
+}

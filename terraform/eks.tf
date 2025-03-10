@@ -15,7 +15,7 @@ module "eks" {
 
   eks_managed_node_groups = {
     default = {
-      instance_types = ["t3.medium"]
+      instance_types = ["t3.small"]
       min_size       = 1
       max_size       = 3
       desired_size   = 2
@@ -33,4 +33,9 @@ data "aws_subnets" "default" {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
   }
+}
+
+resource "aws_eks_access_entry" "admin_access" {
+  cluster_name   = var.cluster_name
+  principal_arn  = var.admin_user
 }
