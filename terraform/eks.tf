@@ -35,8 +35,8 @@ data "aws_subnets" "default" {
   }
 }
 
-# resource "aws_eks_access_entry" "admin_access" {
-#   cluster_name   = module.eks.cluster_name
-#   principal_arn  = var.admin_user
-#   depends_on = [module.eks]
-# }
+resource "aws_eks_access_entry" "admin_access" {
+  cluster_name   = module.eks.cluster_name
+  principal_arn  = var.admin_user
+  depends_on = [module.eks]
+}
