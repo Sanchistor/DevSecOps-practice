@@ -3,71 +3,58 @@ pipeline {
 
     environment {
         AWS_REGION = 'eu-west-1'
+        ECR_REPO = '823164954914.dkr.ecr.eu-west-1.amazonaws.com/internal-sales'
+        IMAGE_TAG = "wagtail"
+        KUBE_NAMESPACE = 'wagtail'
+        HELM_RELEASE_NAME = 'wagtail-release'
+        CLUSTER_NAME = 'MYAPP-EKS'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'provion-resources', url: 'https://github.com/Sanchistor/DevSecOps-practice.git'
+                git branch: 'wagtail-deployment', url: 'https://github.com/Sanchistor/DevSecOps-practice.git'
             }
         }
 
-        stage('Terraform Init & Plan') {
+         stage('Authenticate to AWS ECR') {
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            cd terraform
-                            ls -al
-                            terraform init
-                            terraform plan
+                            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
                         '''
                     }
                 }
             }
         }
 
-        stage('Terraform Apply - Deploy AWS Resources') {
+        stage('Build and Push Docker Image to ECR') {
             steps {
                 script {
-                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                        sh '''
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            cd terraform
-                            terraform apply -auto-approve
-                        '''
-                    }
+                    sh '''
+                        docker build -t $ECR_REPO:$IMAGE_TAG .
+                        docker push $ECR_REPO:$IMAGE_TAG
+                    '''
                 }
             }
         }
 
-        stage('Approval for Destroy') {
-            steps {
-                input message: 'Do you want to destroy AWS resources?', ok: 'Destroy'
-            }
-        }
-
-        stage('Terraform Destroy - Clean Up AWS Resources') {
+        stage('Deploy to EKS using Helm') {
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            cd terraform
-                            terraform destroy -auto-approve
+                            aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
+                            
                         '''
                     }
                 }
             }
         }
     }
+
+        
 
     post {
         success {
@@ -75,17 +62,6 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed. Attempting to clean up resources...'
-            script {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                    sh '''
-                        export AWS_REGION=$AWS_REGION
-                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                        cd terraform
-                        terraform destroy -auto-approve || true
-                    '''
-                }
-            }
         }
     }
 }

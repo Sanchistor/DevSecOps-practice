@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: wagtail
+  template:
+    metadata:
+      labels:
+        app: wagtail
+    spec:
+      containers:
+        - name: {{ .Values.image.app.container.name }}
+          image: "{{ .Values.image.app.container.image.repository }}:{{ .Values.image.app.container.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.image.app.container.port }}
+      imagePullSecrets:
+        - name: {{ .Values.image.app.container.image.pullSecrets }}   
