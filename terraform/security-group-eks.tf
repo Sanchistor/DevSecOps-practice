@@ -79,7 +79,7 @@ resource "aws_security_group" "eks_worker_node_sg" {
     from_port   = 30000
     to_port     = 32767
     protocol    = "tcp"
-    cidr_blocks = ["172.19.0.0/24"]
+    cidr_blocks = var.subnet_cidrs
   }
 
   egress {

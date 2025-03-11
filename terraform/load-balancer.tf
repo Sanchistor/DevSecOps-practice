@@ -46,6 +46,7 @@ resource "aws_lb_target_group" "myapp_target_group" {
   port     = 8080
   protocol = "HTTP"
   vpc_id   = data.aws_vpc.default.id
+  target_type = "ip"
 
   health_check {
     path                = "/"
@@ -71,3 +72,25 @@ resource "aws_lb_listener" "myapp_listener" {
   }
 }
 
+# //Deploy aws load balancer controller via helm
+# resource "helm_release" "aws_lb_controller" {
+#   name       = "aws-load-balancer-controller"
+#   repository = "https://aws.github.io/eks-charts"
+#   chart      = "aws-load-balancer-controller"
+#   namespace  = "kube-system"
+
+#   set {
+#     name  = "clusterName"
+#     value = data.aws_eks_cluster.cluster.name
+#   }
+
+#   set {
+#     name  = "serviceAccount.create"
+#     value = "false"
+#   }
+
+#   set {
+#     name  = "serviceAccount.name"
+#     value = "aws-load-balancer-controller"
+#   }
+# }
