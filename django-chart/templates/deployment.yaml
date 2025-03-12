@@ -6,11 +6,11 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: wagtail
+      app: {{ .Values.app }}
   template:
     metadata:
       labels:
-        app: wagtail
+        app: {{ .Values.app }}
     spec:
       containers:
         - name: {{ .Values.image.app.container.name }}
@@ -18,5 +18,31 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.image.app.container.port }}
+          env:
+            - name: {{ .Values.env.postgresDbName.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresDbName.name }}
+            - name: {{ .Values.env.postgresUser.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresUser.name }}
+            - name: {{ .Values.env.postgresPassword.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresPassword.name }}
+            - name: {{ .Values.env.postgresHost.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresHost.name }}
+            - name: {{ .Values.env.postgresPort.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresPort.name }}
       imagePullSecrets:
         - name: {{ .Values.image.app.container.image.pullSecrets }}   

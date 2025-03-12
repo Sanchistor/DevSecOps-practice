@@ -6,6 +6,7 @@
 replicaCount: 1
 namespace: wagtail
 name: wagtail-deployment
+app: wagtail
 
 image:
   app:
@@ -20,6 +21,21 @@ image:
 
 aws:
   accountId: 266735847393
+  secretName: rds-credentials
+
+# Setup naming of env variables used for database connection
+env:
+  postgresDbName:
+    name: POSTGRES_DB
+  postgresUser:
+    name: POSTGRES_USER
+  postgresPassword:
+    name: POSTGRES_PASSWORD
+  postgresHost:
+    name: POSTGRES_HOST
+  postgresPort:
+    name: POSTGRES_PORT
+    
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:
   name: wagtail-sa

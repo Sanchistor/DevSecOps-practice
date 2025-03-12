@@ -52,9 +52,13 @@ pipeline {
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
-                            kubectl get nodes
 
-                            kubect get pods -A -o wide
+                            helm upgrade --install $HELM_RELEASE_NAME ./django-chart \
+                                --namespace $KUBE_NAMESPACE \
+                                --values ./django-chart/values.yaml
+
+                            kubectl get nodes
+                            kubectl get pods -A -o wide
                         '''
                     }
                 }
