@@ -8,7 +8,7 @@ module "eks" {
   vpc_id     = data.aws_vpc.default.id
   subnet_ids = data.aws_subnets.default.ids
 
-  cluster_endpoint_public_access = true
+  cluster_endpoint_public_access           = true
   enable_cluster_creator_admin_permissions = true
 
   cluster_security_group_id = aws_security_group.eks_control_plane_sg.id
@@ -36,7 +36,11 @@ data "aws_subnets" "default" {
 }
 
 resource "aws_eks_access_entry" "admin_access" {
-  cluster_name   = module.eks.cluster_name
-  principal_arn  = var.admin_user
-  depends_on = [module.eks]
+  cluster_name  = module.eks.cluster_name
+  principal_arn = var.admin_user
+  depends_on    = [module.eks]
+}
+
+output "eks_name" {
+  value = module.eks.cluster_name
 }

@@ -13,14 +13,14 @@ variable "app_name" {
 }
 
 // Database Config
-variable "database_name"{
-    type = string
-    default = "myappdb"
+variable "database_name" {
+  type    = string
+  default = "myappdb"
 }
 
 variable "db-username" {
   type    = string
-  default = "username" #move to ssm
+  default = "wagtail" #move to ssm
 }
 
 variable "db-password" {
@@ -38,15 +38,15 @@ variable "cluster_name" {
 variable "subnet_cidrs" {
   description = "List of subnet CIDR blocks"
   type        = list(string)
-  default     = [
+  default = [
     "172.31.16.0/20", # Subnet 1 CIDR block
     "172.31.32.0/20", # Subnet 2 CIDR block
-    "172.31.0.0/20"  # Subnet 3 CIDR block
+    "172.31.0.0/20"   # Subnet 3 CIDR block
   ]
 }
 
 variable "admin_user" {
-    description = "User to access Cluster from AWS console"
-    type = string
-    default = "arn:aws:iam::266735847393:user/admin"
+  description = "User to access Cluster from AWS console"
+  type        = string
+  default     = "arn:aws:iam::266735847393:user/admin"
 }
