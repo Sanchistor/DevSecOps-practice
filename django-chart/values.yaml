@@ -13,7 +13,7 @@ image:
     container:
       name: wagtail-deployment
       image:
-        repository: 823164954914.dkr.ecr.eu-west-1.amazonaws.com/internal-sales
+        repository: 266735847393.dkr.ecr.eu-west-1.amazonaws.com/my-app-ecr
         tag: wagtail  
         pullSecrets: ecr-registry-secret
       port: 8080
@@ -35,7 +35,7 @@ env:
     name: POSTGRES_HOST
   postgresPort:
     name: POSTGRES_PORT
-    
+
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:
   name: wagtail-sa
