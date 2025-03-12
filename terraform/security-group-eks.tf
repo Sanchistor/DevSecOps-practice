@@ -40,10 +40,10 @@ resource "aws_security_group" "eks_worker_node_sg" {
 
   # Allow traffic from Internet
   ingress {
-    from_port       = 8080
-    to_port         = 8080
-    protocol        = "tcp"
-    security_groups = ["0.0.0.0/0"]
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   # Ingress: Allow communication between worker nodes and Kubernetes components (ports 10250, 10256)
