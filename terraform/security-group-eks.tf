@@ -38,14 +38,14 @@ resource "aws_security_group" "eks_worker_node_sg" {
   description = "Security group for worker node"
   vpc_id      = data.aws_vpc.default.id
 
-  # Allow traffic from Load Balancer to worker node's app port
+  # Allow traffic from Internet
   ingress {
-    from_port       = 8080  
+    from_port       = 8080
     to_port         = 8080
     protocol        = "tcp"
-    security_groups = [aws_security_group.load_balancer_sg.id]  # Allow only load balancer traffic
+    security_groups = ["0.0.0.0/0"]
   }
-   
+
   # Ingress: Allow communication between worker nodes and Kubernetes components (ports 10250, 10256)
   ingress {
     from_port   = 10250
@@ -90,10 +90,10 @@ resource "aws_security_group" "eks_worker_node_sg" {
   }
 
   egress {
-    from_port   = 5432  
-    to_port     = 5432   
-    protocol    = "tcp"
-    security_groups = [aws_security_group.rds.id]  # Reference to RDS security group
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.rds.id] # Reference to RDS security group
   }
 
   # Egress: Allow traffic to Kubernetes API server and necessary external services like S3 or ECR registry
