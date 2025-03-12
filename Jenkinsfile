@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         AWS_REGION = 'eu-west-1'
-        ECR_REPO = '823164954914.dkr.ecr.eu-west-1.amazonaws.com/internal-sales'
+        ECR_REPO = '266735847393.dkr.ecr.eu-west-1.amazonaws.com/my-app-ecr'
         IMAGE_TAG = "wagtail"
         KUBE_NAMESPACE = 'wagtail'
         HELM_RELEASE_NAME = 'wagtail-release'
@@ -22,6 +22,9 @@ pipeline {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
                         '''
                     }
@@ -45,8 +48,13 @@ pipeline {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
-                            
+                            kubectl get nodes
+
+                            kubect get pods -A -o wide
                         '''
                     }
                 }
