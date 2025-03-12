@@ -54,6 +54,31 @@ pipeline {
             }
         }
 
+        stage('Create Databases in RDS') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                            # Fetch RDS Endpoint from Terraform Outputs
+                            export RDS_HOST=$(aws rds describe-db-instances --query "DBInstances[0].Endpoint.Address" --output text)
+
+                            # List of Databases to Create
+                            DB_NAMES="wagtaildb aspnet_db"
+
+                            # Create Databases in PostgreSQL
+                            for DB in $DB_NAMES; do
+                                PGPASSWORD=$POSTGRES_PASSWORD psql -h $RDS_HOST -U $POSTGRES_USER -d postgres -c "CREATE DATABASE $DB;"
+                            done
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Setup Kubernetes Cluster') {
             steps {
                 script {
