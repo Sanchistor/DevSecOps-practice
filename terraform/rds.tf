@@ -16,7 +16,6 @@ resource "aws_db_instance" "rds" {
   }
 }
 
-
 output "rds_endpoint" {
-  value = aws_db_instance.rds.endpoint
+  value = split(":", aws_db_instance.rds.endpoint)[0]
 }
