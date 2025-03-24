@@ -46,3 +46,22 @@ spec:
                   key: {{ .Values.env.postgresPort.name }}
       imagePullSecrets:
         - name: {{ .Values.image.app.container.image.pullSecrets }}   
+
+
+--- 
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.app }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 80  
+      targetPort: {{ .Values.image.app.container.port }} 
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.app }} 
