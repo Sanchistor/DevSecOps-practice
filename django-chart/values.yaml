@@ -27,6 +27,14 @@ service:
   name: wagtail-service
   port: 80
 
+superuser:
+  job:
+    name: wagtail-superuser-job
+  create: true
+  username: admin
+  email: admin@example.com
+  password: SuperSecretPassword
+
 # Setup naming of env variables used for database connection
 env:
   postgresDbName:

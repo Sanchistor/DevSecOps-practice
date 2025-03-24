@@ -1,0 +1,3 @@
+{{- if .Values.superuser.create }}
+{{ include "wagtail.superuserJob" . }}
+{{- end }}

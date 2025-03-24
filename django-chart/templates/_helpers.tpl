@@ -60,3 +60,63 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "wagtail.superuserJob" -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.superuser.job.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.app }}
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: create-superuser
+          image: "{{ .Values.image.app.container.image.repository }}:{{ .Values.image.app.container.image.tag }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Checking if superuser exists..."
+              python manage.py shell <<EOF
+              from django.contrib.auth import get_user_model
+              User = get_user_model()
+              if not User.objects.filter(username="{{ .Values.superuser.username }}").exists():
+                  print("Creating superuser...")
+                  User.objects.create_superuser(
+                      "{{ .Values.superuser.username }}",
+                      "{{ .Values.superuser.email }}",
+                      "{{ .Values.superuser.password }}"
+                  )
+              else:
+                  print("Superuser already exists.")
+              EOF
+          env:
+            - name: {{ .Values.env.postgresDbName.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresDbName.name }}
+            - name: {{ .Values.env.postgresUser.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresUser.name }}
+            - name: {{ .Values.env.postgresPassword.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresPassword.name }}
+            - name: {{ .Values.env.postgresHost.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresHost.name }}
+            - name: {{ .Values.env.postgresPort.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresPort.name }}
+{{- end }}
