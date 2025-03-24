@@ -3,6 +3,7 @@ resource "aws_ecr_repository" "aws-ecr" {
   tags = {
     Environment = var.tag-name
   }
+  force_delete = true
 }
 
 output "ecr_repository_url" {
