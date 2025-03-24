@@ -1,0 +1,20 @@
+# Ignore Helm charts
+django-chart/
+helm/
+*.tgz
+
+# Ignore Git files
+.git/
+.gitignore
+
+# Ignore local configs and secrets
+*.env
+*.DS_Store
+*.log
+secrets/
+config/
+
+# Ignore Python cache (if using Django/Wagtail)
+__pycache__/
+*.pyc
+*.pyo
