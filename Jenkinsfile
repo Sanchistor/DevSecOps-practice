@@ -8,7 +8,6 @@ pipeline {
         KUBE_NAMESPACE = 'wagtail'
         HELM_RELEASE_NAME = 'wagtail-release'
         CLUSTER_NAME = 'MYAPP-EKS'
-        PATH = "$PATH:/snap/bin"
     }
 
     stages {
@@ -22,6 +21,7 @@ pipeline {
             steps {
                 script {
                     sh '''
+                        export PATH=$HOME/.local/bin:$PATH
                         semgrep scan --config "p/python" --json > semgrep-report.json || true
                     '''
                 }
