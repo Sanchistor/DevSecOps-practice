@@ -89,10 +89,13 @@ pipeline {
 
                             helm upgrade --install $HELM_RELEASE_NAME ./django-chart \
                                 --namespace $KUBE_NAMESPACE \
-                                --values ./django-chart/values.yaml
+                                --values ./django-chart/values.yaml \
+                                --recreate-pods
 
                             kubectl get nodes
                             kubectl get pods -A -o wide
+
+                            helm status $HELM_RELEASE_NAME --namespace $KUBE_NAMESPACE
                         '''
                     }
                 }
