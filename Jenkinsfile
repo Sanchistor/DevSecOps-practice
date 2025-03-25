@@ -120,6 +120,23 @@ pipeline {
 
                             #Verify creation of secrets
                             kubectl get secrets -n $KUBE_NAMESPACE
+
+                            # --------------------------------------
+                            # Install NGINX Ingress Controller
+                            # --------------------------------------
+
+                            # Create namespace for Ingress
+                            kubectl create namespace ingress-nginx --dry-run=client -o yaml | kubectl apply -f -
+
+                            # Add Helm repository for NGINX Ingress
+                            helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+                            helm repo update
+
+                            #Install ingress-nginx on K8S cluster
+                            helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+                               --namespace ingress-nginx \
+                               --set controller.service.type=LoadBalancer
+
                         '''
                     }
                 }
