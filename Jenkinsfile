@@ -21,7 +21,21 @@ pipeline {
             steps {
                 script {
                     sh '''
+                        # Ensure semgrep is installed if not available
+                        if ! command -v semgrep &> /dev/null
+                        then
+                            echo "semgrep not found, installing..."
+                            pip install --user semgrep
+                        fi
+
+                        # Ensure ~/.local/bin is in the PATH
                         export PATH=$HOME/.local/bin:$PATH
+
+                        # Verify that semgrep is accessible
+                        echo "Checking semgrep version..."
+                        semgrep --version
+
+                        # Run semgrep scan
                         semgrep scan --config "p/python" --json > semgrep-report.json || true
                     '''
                 }
