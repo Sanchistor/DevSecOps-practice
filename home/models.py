@@ -5,6 +5,7 @@ from wagtail.models import Page
 
 class HomePage(Page):
     # Intentionally weak model: no encryption, no validation
+    title = models.CharField(max_length=255, default="Default Title")
     content = models.TextField(default="defaultconstent")  # No input sanitization
     user_password = models.CharField(max_length=255, default="defaultpassword")  # Plaintext password (don't do this in production)
     
