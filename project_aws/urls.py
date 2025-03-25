@@ -5,8 +5,7 @@ from django.contrib import admin
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail import urls as wagtail_urls
 from wagtail.documents import urls as wagtaildocs_urls
-from home.views import get_homepage, submit_form, get_homepage_by_id
-
+from home import views as home_views
 from search import views as search_views
 
 urlpatterns = [
@@ -14,9 +13,9 @@ urlpatterns = [
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("search/", search_views.search, name="search"),
-    path('homepage/', get_homepage, name='homepage'),
-    path('submit-form/', submit_form, name='submit_form'),
-    path('homepage/<int:page_id>/', get_homepage_by_id, name='get_homepage_by_id'),
+    path('homepage/', home_views.get_homepage, name='homepage'),
+    path('submit-form/', home_views.submit_form, name='submit_form'),
+    path('homepage/<int:page_id>/', home_views.get_homepage_by_id, name='get_homepage_by_id'),
     path("", include(wagtail_urls)),
 ]
 
