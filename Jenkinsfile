@@ -16,6 +16,24 @@ pipeline {
                 git branch: 'wagtail-deployment', url: 'https://github.com/Sanchistor/DevSecOps-practice.git'
             }
         }
+        
+         stage('Run SAST Scan with Semgrep') {
+            steps {
+                script {
+                    sh '''
+                        semgrep scan --config "p/python" --json > semgrep-report.json || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
+                }
+                failure {
+                    echo 'SAST scan detected issues. Check semgrep-report.json'
+                }
+            }
+        }
 
          stage('Authenticate to AWS ECR') {
             steps {
