@@ -17,6 +17,7 @@ urlpatterns = [
     path('homepage/', get_homepage, name='homepage'),
     path('submit-form/', submit_form, name='submit_form'),
     path('homepage/<int:page_id>/', get_homepage_by_id, name='get_homepage_by_id'),
+    path("", include(wagtail_urls)),
 ]
 
 
