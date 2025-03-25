@@ -8,6 +8,7 @@ pipeline {
         KUBE_NAMESPACE = 'wagtail'
         HELM_RELEASE_NAME = 'wagtail-release'
         CLUSTER_NAME = 'MYAPP-EKS'
+        PATH = "$PATH:/snap/bin"
     }
 
     stages {
@@ -16,7 +17,7 @@ pipeline {
                 git branch: 'wagtail-deployment', url: 'https://github.com/Sanchistor/DevSecOps-practice.git'
             }
         }
-        
+
          stage('Run SAST Scan with Semgrep') {
             steps {
                 script {
