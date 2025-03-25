@@ -21,7 +21,6 @@ def submit_form(request):
     return render(request, 'home/form.html')
 
 # Vulnerable to IDOR (Insecure Direct Object Reference)
-def get_homepage(request, page_id):
-   
+def get_homepage_by_id(request, page_id):
     page = HomePage.objects.get(id=page_id)  # No access control checks
-    return render(request, 'home/homepage.html', {'page': page})
+    return render(request, 'home/homepage_by_id.html', {'page': page})
