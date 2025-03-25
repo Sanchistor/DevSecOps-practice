@@ -36,7 +36,7 @@ pipeline {
                         semgrep --version
 
                         # Run semgrep scan
-                        semgrep scan --config "p/python" --json > semgrep-report.json || true
+                        semgrep scan --config "auto" --severity INFO,WARNING,ERROR --json > semgrep-report.json || true
                     '''
                 }
             }
