@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 def get_homepage(request):
     # Potential SQL Injection Vulnerability: unsafe query concatenation
     page_title = request.GET.get('title', '')
-    query = f"SELECT * FROM home_homepage WHERE title = '{page_title}'"
+    query = f"SELECT * FROM home_homepage WHERE title1 = '{page_title}'"
     with connection.cursor() as cursor:
         cursor.execute(query)
         page = cursor.fetchall()
