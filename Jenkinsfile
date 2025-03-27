@@ -44,6 +44,15 @@ pipeline {
 
                     def vulnerabilityCount = sh(script: 'jq ".results | length" semgrep-report.json', returnStdout: true).trim()
                     echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+                    sh """
+                        aws cloudwatch put-metric-data \
+                            --namespace 'Security' \
+                            --metric-name 'Vulnerabilities' \
+                            --value ${vulnerabilityCount} \
+                            --unit 'Count' \
+                            --dimensions "Build=${env.BUILD_ID},Type=SAST" \
+                            --region ${AWS_REGION}
+                    """
                 }
             }
         }
@@ -69,18 +78,16 @@ pipeline {
                         // Fetch the number of vulnerabilities from the safety report
                         def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+
                         // Send the number of vulnerabilities to CloudWatch
                         sh """
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             aws cloudwatch put-metric-data \
-                                --namespace 'Security' \
-                                --metric-name 'Vulnerabilities' \
-                                --value ${vulnerabilityCount} \
-                                --unit 'Count' \
-                                --dimensions 'Build=${env.BUILD_ID}' \
-                                --region ${AWS_REGION}
+                            --namespace 'Security' \
+                            --metric-name 'Vulnerabilities' \
+                            --value ${vulnerabilityCount} \
+                            --unit 'Count' \
+                            --dimensions "Build=${env.BUILD_ID},Type=DependencyCheck" \
+                            --region ${AWS_REGION}
                         """
                     }
                 }
