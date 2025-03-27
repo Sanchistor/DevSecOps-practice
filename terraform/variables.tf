@@ -50,3 +50,9 @@ variable "admin_user" {
   type        = string
   default     = "arn:aws:iam::266735847393:user/admin"
 }
+
+
+variable "build_id" {
+  type        = string
+  description = "The ID of the build to correlate metrics with."
+}
