@@ -3,6 +3,6 @@ wagtail>=6.4,<6.5
 psycopg2-binary
 
 # Vulnerable dependencies for testing
-requests==2.19.1  # CVE-2018-18074
-flask==0.12.2  # CVE-2018-1000656
-pyyaml==5.1.2  # CVE-2017-18342
+requests==2.19.1  
+flask==0.12.2  
+pyyaml==5.1.2  

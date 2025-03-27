@@ -61,7 +61,7 @@ pipeline {
                         export PATH=$HOME/.local/bin:$PATH
                         export SAFETY_API_KEY=${SAFETY_API_KEY}
 
-                        safety scan -r requirements.txt --json --debug > safety-report.json || true
+                        safety scan -r requirements.txt --json > safety-report.json || true
                     '''
                     archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
 
