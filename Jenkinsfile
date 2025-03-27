@@ -66,7 +66,7 @@ pipeline {
                     archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
 
                     // Fetch the number of vulnerabilities from the safety report
-                    def vulnerabilityCount = sh(script: 'jq ".vulnerabilities | length" safety-report.json', returnStdout: true).trim()
+                    def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
                     echo "Number of vulnerabilities found: ${vulnerabilityCount}"
                     // Send the number of vulnerabilities to CloudWatch
                     // sh """
