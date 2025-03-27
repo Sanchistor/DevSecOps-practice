@@ -59,7 +59,7 @@ pipeline {
                         # Ensure ~/.local/bin is in the PATH
                         export PATH=$HOME/.local/bin:$PATH
 
-                        afety check -r requirements.txt --json > safety-report.json || true
+                        safety check -r requirements.txt --json > safety-report.json || true
                     '''
                     archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
 
