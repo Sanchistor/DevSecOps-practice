@@ -5,4 +5,4 @@ psycopg2-binary
 # Vulnerable dependencies for testing
 requests==2.19.1  # CVE-2018-18074
 flask==0.12.2  # CVE-2018-1000656
-pyyaml==4.1  # CVE-2017-18342
+pyyaml==5.1.2  # CVE-2017-18342
