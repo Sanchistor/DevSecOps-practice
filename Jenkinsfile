@@ -37,18 +37,39 @@ pipeline {
 
                         # Run semgrep scan
                         semgrep scan --config auto --severity INFO --severity WARNING --severity ERROR --json > semgrep-report.json || true
+                        
                     '''
-                }
-            }
-            post {
-                always {
                     archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
-                }
-                failure {
-                    echo 'SAST scan detected issues. Check semgrep-report.json'
                 }
             }
         }
+
+        stage('Run Dependency Scanning with Safety') {
+            steps {
+                script {
+                    sh '''
+                        if ! command -v safety &> /dev/null
+                        then
+                            echo "Installing Safety..."
+                            pip install safety
+                        fi
+                        safety check --full-report > safety_report.txt || true
+                    '''
+                    archiveArtifacts artifacts: 'safety_report.txt', allowEmptyArchive: true
+                }
+            }
+        }
+
+        // stage('Run Dependency Scaning with Snyk') {
+        //     steps {
+        //         script {
+        //             sh '''
+                        
+        //             '''
+        //         }
+        //     }
+            
+        // }
 
          stage('Authenticate to AWS ECR') {
             steps {
