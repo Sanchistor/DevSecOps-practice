@@ -40,6 +40,9 @@ pipeline {
                         
                     '''
                     archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
+
+                    def vulnerabilityCount = sh(script: 'jq ".results | length" semgrep-report.json', returnStdout: true).trim()
+                    echo "Number of vulnerabilities found: ${vulnerabilityCount}"
                 }
             }
         }
@@ -56,23 +59,21 @@ pipeline {
                         # Ensure ~/.local/bin is in the PATH
                         export PATH=$HOME/.local/bin:$PATH
 
-                        safety check -r requirements.txt --full-report > safety_report.txt || true
+                        safety check -r requirements.txt --full-report --json > safety-report.json || true
                     '''
-                    archiveArtifacts artifacts: 'safety_report.txt', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
+
+                    // Fetch the number of vulnerabilities from the safety report
+                    def vulnerabilityCount = sh(script: 'jq ".vulnerabilities | length" safety-report.json', returnStdout: true).trim()
+                    echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+                    // Send the number of vulnerabilities to CloudWatch
+                    // sh """
+                    //     aws cloudwatch put-metric-data --namespace 'Security' --metric-name 'Vulnerabilities' --value ${vulnerabilityCount} --unit 'Count' --dimensions 'Build=YourBuildID' --region $AWS_REGION
+                    // """
                 }
             }
         }
 
-        // stage('Run Dependency Scaning with Snyk') {
-        //     steps {
-        //         script {
-        //             sh '''
-                        
-        //             '''
-        //         }
-        //     }
-            
-        // }
 
          stage('Authenticate to AWS ECR') {
             steps {
