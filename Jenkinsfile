@@ -51,8 +51,11 @@ pipeline {
                         if ! command -v safety &> /dev/null
                         then
                             echo "Installing Safety..."
-                            pip install safety
+                            pip install --user safety
                         fi
+                        # Ensure ~/.local/bin is in the PATH
+                        export PATH=$HOME/.local/bin:$PATH
+                        
                         safety check --full-report > safety_report.txt || true
                     '''
                     archiveArtifacts artifacts: 'safety_report.txt', allowEmptyArchive: true
