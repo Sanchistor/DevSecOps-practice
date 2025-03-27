@@ -21,38 +21,44 @@ pipeline {
          stage('Run SAST Scan with Semgrep') {
             steps {
                 script {
-                    sh '''
-                        # Ensure semgrep is installed if not available
-                        if ! command -v semgrep &> /dev/null
-                        then
-                            echo "semgrep not found, installing..."
-                            pip install --user semgrep
-                        fi
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh '''
+                            # Ensure semgrep is installed if not available
+                            if ! command -v semgrep &> /dev/null
+                            then
+                                echo "semgrep not found, installing..."
+                                pip install --user semgrep
+                            fi
 
-                        # Ensure ~/.local/bin is in the PATH
-                        export PATH=$HOME/.local/bin:$PATH
+                            # Ensure ~/.local/bin is in the PATH
+                            export PATH=$HOME/.local/bin:$PATH
 
-                        # Verify that semgrep is accessible
-                        echo "Checking semgrep version..."
-                        semgrep --version
+                            # Verify that semgrep is accessible
+                            echo "Checking semgrep version..."
+                            semgrep --version
 
-                        # Run semgrep scan
-                        semgrep scan --config auto --severity INFO --severity WARNING --severity ERROR --json > semgrep-report.json || true
-                        
-                    '''
-                    archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
+                            # Run semgrep scan
+                            semgrep scan --config auto --severity INFO --severity WARNING --severity ERROR --json > semgrep-report.json || true
+                            
+                        '''
+                        archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
 
-                    def vulnerabilityCount = sh(script: 'jq ".results | length" semgrep-report.json', returnStdout: true).trim()
-                    echo "Number of vulnerabilities found: ${vulnerabilityCount}"
-                    sh """
-                        aws cloudwatch put-metric-data \
-                            --namespace 'Security' \
-                            --metric-name 'Vulnerabilities' \
-                            --value ${vulnerabilityCount} \
-                            --unit 'Count' \
-                            --dimensions "Build=${env.BUILD_ID},Type=SAST" \
-                            --region ${AWS_REGION}
-                    """
+                        def vulnerabilityCount = sh(script: 'jq ".results | length" semgrep-report.json', returnStdout: true).trim()
+                        echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+                        sh """
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            
+                            aws cloudwatch put-metric-data \
+                                --namespace 'Security' \
+                                --metric-name 'Vulnerabilities' \
+                                --value ${vulnerabilityCount} \
+                                --unit 'Count' \
+                                --dimensions "Build=${env.BUILD_ID},Type=SAST" \
+                                --region ${AWS_REGION}
+                        """
+                    }
                 }
             }
         }
@@ -81,6 +87,10 @@ pipeline {
 
                         // Send the number of vulnerabilities to CloudWatch
                         sh """
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
                             aws cloudwatch put-metric-data \
                             --namespace 'Security' \
                             --metric-name 'Vulnerabilities' \
