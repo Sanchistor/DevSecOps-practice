@@ -6,3 +6,10 @@ psycopg2-binary
 requests==2.19.1  
 flask==0.12.2  
 pyyaml==5.1.2  
+
+urllib3==1.24.1  
+jinja2==2.10.1    
+markupsafe==1.0  
+cryptography==2.3  
+sqlalchemy==1.2.17  
+django==2.2.1 
