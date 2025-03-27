@@ -55,8 +55,8 @@ pipeline {
                         fi
                         # Ensure ~/.local/bin is in the PATH
                         export PATH=$HOME/.local/bin:$PATH
-                        
-                        safety check --full-report > safety_report.txt || true
+
+                        safety check -r requirements.txt --full-report > safety_report.txt || true
                     '''
                     archiveArtifacts artifacts: 'safety_report.txt', allowEmptyArchive: true
                 }
