@@ -55,7 +55,7 @@ pipeline {
                                 --metric-name 'Vulnerabilities' \
                                 --value ${vulnerabilityCount} \
                                 --unit 'Count' \
-                                --dimensions "Type=SAST,Build=${env.BUILD_ID}" \
+                                --dimensions "Type=SAST" \
                                 --region ${AWS_REGION}
                         """
                     }
@@ -96,7 +96,7 @@ pipeline {
                             --metric-name 'Vulnerabilities' \
                             --value ${vulnerabilityCount} \
                             --unit 'Count' \
-                            --dimensions "Type=DependencyCheck,Build=${env.BUILD_ID}" \
+                            --dimensions "Type=DependencyCheck" \
                             --region ${AWS_REGION}
                         """
                     }
