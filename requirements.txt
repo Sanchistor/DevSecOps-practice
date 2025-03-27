@@ -5,6 +5,7 @@ psycopg2-binary
 # Vulnerable dependencies for testing
 requests==2.19.1  
 flask==0.12.2  
-pyyaml==5.1.2  
-urllib3==1.24.1  
+pyyaml==5.1.2    
 jinja2==2.10.1    
+cryptography==2.3  
+sqlalchemy==1.2.17  
