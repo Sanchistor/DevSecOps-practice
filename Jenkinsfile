@@ -49,13 +49,13 @@ pipeline {
                             export AWS_REGION=$AWS_REGION
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            
+
                             aws cloudwatch put-metric-data \
                                 --namespace 'Security' \
                                 --metric-name 'Vulnerabilities' \
                                 --value ${vulnerabilityCount} \
                                 --unit 'Count' \
-                                --dimensions "Build=${env.BUILD_ID},Type=SAST" \
+                                --dimensions "Type=SAST,Build=${env.BUILD_ID}" \
                                 --region ${AWS_REGION}
                         """
                     }
@@ -96,7 +96,7 @@ pipeline {
                             --metric-name 'Vulnerabilities' \
                             --value ${vulnerabilityCount} \
                             --unit 'Count' \
-                            --dimensions "Build=${env.BUILD_ID},Type=DependencyCheck" \
+                            --dimensions "Type=DependencyCheck,Build=${env.BUILD_ID}" \
                             --region ${AWS_REGION}
                         """
                     }
