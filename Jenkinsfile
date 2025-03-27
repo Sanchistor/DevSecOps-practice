@@ -51,27 +51,38 @@ pipeline {
         stage('Run Dependency Scanning with Safety') {
             steps {
                 script {
-                    sh '''
-                        if ! command -v safety &> /dev/null
-                        then
-                            echo "Installing Safety..."
-                            pip install --user safety
-                        fi
-                        # Ensure ~/.local/bin is in the PATH
-                        export PATH=$HOME/.local/bin:$PATH
-                        export SAFETY_API_KEY=${SAFETY_API_KEY}
+                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh '''
+                            if ! command -v safety &> /dev/null
+                            then
+                                echo "Installing Safety..."
+                                pip install --user safety
+                            fi
+                            # Ensure ~/.local/bin is in the PATH
+                            export PATH=$HOME/.local/bin:$PATH
+                            export SAFETY_API_KEY=${SAFETY_API_KEY}
 
-                        safety scan -r requirements.txt --output json > safety-report.json || true
-                    '''
-                    archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
+                            safety scan -r requirements.txt --output json > safety-report.json || true
+                        '''
+                        archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
 
-                    // Fetch the number of vulnerabilities from the safety report
-                    def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
-                    echo "Number of vulnerabilities found: ${vulnerabilityCount}"
-                    // Send the number of vulnerabilities to CloudWatch
-                    // sh """
-                    //     aws cloudwatch put-metric-data --namespace 'Security' --metric-name 'Vulnerabilities' --value ${vulnerabilityCount} --unit 'Count' --dimensions 'Build=YourBuildID' --region $AWS_REGION
-                    // """
+                        // Fetch the number of vulnerabilities from the safety report
+                        def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
+                        echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+                        // Send the number of vulnerabilities to CloudWatch
+                        sh """
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            aws cloudwatch put-metric-data \
+                                --namespace 'Security' \
+                                --metric-name 'Vulnerabilities' \
+                                --value ${vulnerabilityCount} \
+                                --unit 'Count' \
+                                --dimensions 'Build=${env.BUILD_ID}' \
+                                --region ${AWS_REGION}
+                        """
+                    }
                 }
             }
         }
