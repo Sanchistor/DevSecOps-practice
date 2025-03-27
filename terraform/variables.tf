@@ -53,6 +53,7 @@ variable "admin_user" {
 
 
 variable "build_id" {
-  type        = string
   description = "The ID of the build to correlate metrics with."
+  type        = string
+  default     = " "
 }
