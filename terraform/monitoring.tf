@@ -11,9 +11,9 @@ resource "aws_cloudwatch_dashboard" "vulnerability_dashboard" {
         "height" : 6,
         "properties" : {
           "metrics" : [
-            ["Security", "Vulnerabilities", "Build", "${var.build_id}", "Type", "SAST"]
+            ["Security", "Vulnerabilities", "Type", "SAST"]
           ],
-          "view" : "timeSeries",
+          "view" : "bar",
           "stacked" : false,
           "region" : "${var.region}",
           "stat" : "Sum",
@@ -29,9 +29,9 @@ resource "aws_cloudwatch_dashboard" "vulnerability_dashboard" {
         "height" : 6,
         "properties" : {
           "metrics" : [
-            ["Security", "Vulnerabilities", "Build", "${var.build_id}", "Type", "DAST"]
+            ["Security", "Vulnerabilities", "Type", "DAST"]
           ],
-          "view" : "timeSeries",
+          "view" : "bar",
           "stacked" : false,
           "region" : "${var.region}",
           "stat" : "Sum",
@@ -47,9 +47,9 @@ resource "aws_cloudwatch_dashboard" "vulnerability_dashboard" {
         "height" : 6,
         "properties" : {
           "metrics" : [
-            ["Security", "Vulnerabilities", "Build", "${var.build_id}", "Type", "DependencyCheck"]
+            ["Security", "Vulnerabilities", "Type", "DependencyCheck"]
           ],
-          "view" : "timeSeries",
+          "view" : "bar",
           "stacked" : false,
           "region" : "${var.region}",
           "stat" : "Sum",
