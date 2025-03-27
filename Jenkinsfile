@@ -8,6 +8,7 @@ pipeline {
         KUBE_NAMESPACE = 'wagtail'
         HELM_RELEASE_NAME = 'wagtail-release'
         CLUSTER_NAME = 'MYAPP-EKS'
+        SAFETY_API_KEY = credentials('safety-api-key')
     }
 
     stages {
@@ -58,6 +59,7 @@ pipeline {
                         fi
                         # Ensure ~/.local/bin is in the PATH
                         export PATH=$HOME/.local/bin:$PATH
+                        export SAFETY_API_KEY=${SAFETY_API_KEY}
 
                         safety scan -r requirements.txt --json --debug > safety-report.json || true
                     '''
