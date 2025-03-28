@@ -42,6 +42,7 @@ pipeline {
                             
                         '''
                         archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
+                        BUILD_ID=${env.BUILD_ID}
 
                         def vulnerabilityCount = sh(script: 'jq ".results | length" semgrep-report.json', returnStdout: true).trim()
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
@@ -51,12 +52,12 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
                             aws cloudwatch put-metric-data \
-                                --namespace 'Security' \
-                                --metric-name 'Vulnerabilities' \
-                                --value ${vulnerabilityCount} \
-                                --unit 'Count' \
-                                --dimensions "Type=SAST" \
-                                --region ${AWS_REGION}
+                                --namespace "Security" \
+                                --metric-name "SAST_Vulnerabilities" \
+                                --value $vulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
                         """
                     }
                 }
@@ -80,6 +81,7 @@ pipeline {
                             safety scan -r requirements.txt --output json > safety-report.json || true
                         '''
                         archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
+                        BUILD_ID=${env.BUILD_ID}
 
                         // Fetch the number of vulnerabilities from the safety report
                         def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
@@ -92,12 +94,12 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
                             aws cloudwatch put-metric-data \
-                            --namespace 'Security' \
-                            --metric-name 'Vulnerabilities' \
-                            --value ${vulnerabilityCount} \
-                            --unit 'Count' \
-                            --dimensions "Type=DependencyCheck" \
-                            --region ${AWS_REGION}
+                                --namespace "Security" \
+                                --metric-name "DepScan_Vulnerabilities" \
+                                --value $vulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
                         """
                     }
                 }
