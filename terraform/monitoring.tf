@@ -11,12 +11,12 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
         "height" = 6,
         "properties" = {
           "metrics" = [
-            ["Security", "SAST_Vulnerabilities", "Build", "{Build}"]
+            ["Security", "SAST_Vulnerabilities", "Build"]
           ],
           "title"  = "SAST Vulnerabilities per Build",
           "stat"   = "Sum",
           "region" = var.region,
-          "period" = 3600,
+          "period" = 300,
           "view"   = "timeSeries"
         }
       },
@@ -28,12 +28,12 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
         "height" = 6,
         "properties" = {
           "metrics" = [
-            ["Security", "DAST_Vulnerabilities", "Build", "{Build}"]
+            ["Security", "DAST_Vulnerabilities", "Build"]
           ],
           "title"  = "DAST Vulnerabilities per Build",
           "stat"   = "Sum",
           "region" = var.region,
-          "period" = 3600,
+          "period" = 300,
           "view"   = "timeSeries"
         }
       },
@@ -45,12 +45,12 @@ resource "aws_cloudwatch_dashboard" "security_dashboard" {
         "height" = 6,
         "properties" = {
           "metrics" = [
-            ["Security", "DepScan_Vulnerabilities", "Build", "{Build}"]
+            ["Security", "DepScan_Vulnerabilities", "Build"]
           ],
           "title"  = "Dependency Scan Vulnerabilities per Build",
           "stat"   = "Sum",
           "region" = var.region,
-          "period" = 3600,
+          "period" = 300,
           "view"   = "timeSeries"
         }
       }
