@@ -1,60 +1,57 @@
-resource "aws_cloudwatch_dashboard" "vulnerability_dashboard" {
-  dashboard_name = "VulnerabilityHistoryDashboard"
+resource "aws_cloudwatch_dashboard" "security_dashboard" {
+  dashboard_name = "SecurityDashboard"
 
   dashboard_body = jsonencode({
-    "widgets" : [
+    "widgets" = [
       {
-        "type" : "metric",
-        "x" : 0,
-        "y" : 0,
-        "width" : 8,
-        "height" : 6,
-        "properties" : {
-          "metrics" : [
-            ["Security", "Vulnerabilities", "Type", "SAST"]
+        "type"   = "metric",
+        "x"      = 0,
+        "y"      = 0,
+        "width"  = 12,
+        "height" = 6,
+        "properties" = {
+          "metrics" = [
+            ["Security", "SAST_Vulnerabilities", "Build", "{Build}"]
           ],
-          "view" : "bar",
-          "stacked" : false,
-          "region" : "${var.region}",
-          "stat" : "Sum",
-          "period" : 300,
-          "title" : "Vulnerabilities (SAST)"
+          "title"  = "SAST Vulnerabilities per Build",
+          "stat"   = "Sum",
+          "region" = var.region,
+          "period" = 3600,
+          "view"   = "timeSeries"
         }
       },
       {
-        "type" : "metric",
-        "x" : 8,
-        "y" : 0,
-        "width" : 8,
-        "height" : 6,
-        "properties" : {
-          "metrics" : [
-            ["Security", "Vulnerabilities", "Type", "DAST"]
+        "type"   = "metric",
+        "x"      = 0,
+        "y"      = 6,
+        "width"  = 12,
+        "height" = 6,
+        "properties" = {
+          "metrics" = [
+            ["Security", "DAST_Vulnerabilities", "Build", "{Build}"]
           ],
-          "view" : "bar",
-          "stacked" : false,
-          "region" : "${var.region}",
-          "stat" : "Sum",
-          "period" : 300,
-          "title" : "Vulnerabilities (DAST)"
+          "title"  = "DAST Vulnerabilities per Build",
+          "stat"   = "Sum",
+          "region" = var.region,
+          "period" = 3600,
+          "view"   = "timeSeries"
         }
       },
       {
-        "type" : "metric",
-        "x" : 16,
-        "y" : 0,
-        "width" : 8,
-        "height" : 6,
-        "properties" : {
-          "metrics" : [
-            ["Security", "Vulnerabilities", "Type", "DependencyCheck"]
+        "type"   = "metric",
+        "x"      = 0,
+        "y"      = 12,
+        "width"  = 12,
+        "height" = 6,
+        "properties" = {
+          "metrics" = [
+            ["Security", "DepScan_Vulnerabilities", "Build", "{Build}"]
           ],
-          "view" : "bar",
-          "stacked" : false,
-          "region" : "${var.region}",
-          "stat" : "Sum",
-          "period" : 300,
-          "title" : "Vulnerabilities (Dependency Check)"
+          "title"  = "Dependency Scan Vulnerabilities per Build",
+          "stat"   = "Sum",
+          "region" = var.region,
+          "period" = 3600,
+          "view"   = "timeSeries"
         }
       }
     ]
