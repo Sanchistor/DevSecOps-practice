@@ -87,7 +87,7 @@ pipeline {
                         def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
 
-                        Send the number of vulnerabilities to CloudWatch
+                        //Send the number of vulnerabilities to CloudWatch
                         sh """
                             BUILD_ID=${env.BUILD_ID}
                             export AWS_REGION=$AWS_REGION
