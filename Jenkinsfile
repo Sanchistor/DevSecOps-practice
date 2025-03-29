@@ -45,20 +45,20 @@ pipeline {
 
                         def vulnerabilityCount = sh(script: 'jq ".results | length" semgrep-report.json', returnStdout: true).trim()
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
-                        // sh """
-                        //     BUILD_ID=${env.BUILD_ID}
-                        //     export AWS_REGION=$AWS_REGION
-                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        sh """
+                            BUILD_ID=${env.BUILD_ID}
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
-                        //     aws cloudwatch put-metric-data \
-                        //         --namespace "Security" \
-                        //         --metric-name "SAST_Vulnerabilities" \
-                        //         --value $vulnerabilityCount \
-                        //         --unit "Count" \
-                        //         --dimensions "Build=$BUILD_ID" \
-                        //         --region $AWS_REGION
-                        // """
+                            aws cloudwatch put-metric-data \
+                                --namespace "Security" \
+                                --metric-name "SAST_Vulnerabilities" \
+                                --value $vulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
+                        """
                     }
                 }
             }
@@ -87,21 +87,21 @@ pipeline {
                         def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
 
-                        // Send the number of vulnerabilities to CloudWatch
-                        // sh """
-                        //     BUILD_ID=${env.BUILD_ID}
-                        //     export AWS_REGION=$AWS_REGION
-                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        Send the number of vulnerabilities to CloudWatch
+                        sh """
+                            BUILD_ID=${env.BUILD_ID}
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
-                        //     aws cloudwatch put-metric-data \
-                        //         --namespace "Security" \
-                        //         --metric-name "DepScan_Vulnerabilities" \
-                        //         --value $vulnerabilityCount \
-                        //         --unit "Count" \
-                        //         --dimensions "Build=$BUILD_ID" \
-                        //         --region $AWS_REGION
-                        // """
+                            aws cloudwatch put-metric-data \
+                                --namespace "Security" \
+                                --metric-name "DepScan_Vulnerabilities" \
+                                --value $vulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
+                        """
                     }
                 }
             }
