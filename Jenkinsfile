@@ -47,22 +47,22 @@ pipeline {
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
 
                         // Prepare JSON payload for Lambda function
-                        def payload = """{
-                        "apllication_language": "Wagtail",
-                        "build_number": "${env.BUILD_ID}",
-                        "test_type": "SAST",
-                        "version": "1.114.0",
-                        "results": $(cat semgrep-report.json)
-                        }"""
-
-                        writeFile file: 'lambda-payload.json', text: payload
+                        sh '''
+                            echo '{
+                                "application_language": "Wagtail",
+                                "build_number": "'"${BUILD_ID}"'",
+                                "test_type": "SAST",
+                                "version": "1.114.0",
+                                "results": '$(cat semgrep-report.json)'
+                            }' > lambda-payload.json
+                        '''
 
                         // Invoke Lambda function
                         sh '''
                             export AWS_REGION=$AWS_REGION
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            
+
                             aws lambda invoke \
                                 --function-name SaveLogsToCloudWatch \
                                 --payload file://lambda-payload.json \
