@@ -63,13 +63,20 @@ pipeline {
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
+                            # Ensure the JSON payload is properly formatted
+                            jq . lambda-payload.json > /dev/null
+                            if [ $? -ne 0 ]; then
+                                echo "Invalid JSON payload!"
+                                exit 1
+                            fi
+
                             aws lambda invoke \
                                 --function-name SaveLogsToCloudWatch \
-                                --payload file://lambda-payload.json \
+                                --payload file://<(jq -c . lambda-payload.json) \
                                 --region $AWS_REGION \
                                 --cli-binary-format raw-in-base64-out \
                                 lambda-response.json
-                                
+
                             if [ $? -ne 0 ]; then
                                 echo "Lambda invocation failed!"
                                 exit 1
