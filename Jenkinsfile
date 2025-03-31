@@ -56,6 +56,7 @@ pipeline {
                                 results: .
                             }' semgrep-report.json > lambda-payload.json
                         '''
+                        archiveArtifacts artifacts: 'lambda-payload.json', fingerprint: true
 
                         // Invoke Lambda function
                         sh '''
