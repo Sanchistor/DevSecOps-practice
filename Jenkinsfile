@@ -48,13 +48,13 @@ pipeline {
 
                         // Prepare JSON payload for Lambda function
                         sh '''
-                            echo '{
-                                "application_language": "Wagtail",
-                                "build_number": "'"${BUILD_ID}"'",
-                                "test_type": "SAST",
-                                "version": "1.114.0",
-                                "results": '$(jq -c . semgrep-report.json)'
-                            }' > lambda-payload.json
+                            jq -c --arg build_number "$BUILD_ID" '{
+                                application_language: "Wagtail",
+                                build_number: $build_number,
+                                test_type: "SAST",
+                                version: "1.114.0",
+                                results: .
+                            }' semgrep-report.json > lambda-payload.json
                         '''
 
                         // Invoke Lambda function
