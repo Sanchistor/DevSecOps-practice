@@ -45,20 +45,47 @@ pipeline {
 
                         def vulnerabilityCount = sh(script: 'jq ".results | length" semgrep-report.json', returnStdout: true).trim()
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
-                        sh """
-                            BUILD_ID=${env.BUILD_ID}
+
+                        // Prepare JSON payload for Lambda function
+                        def payload = """{
+                        "apllication_language": "Wagtail",
+                        "build_number": "${env.BUILD_ID}",
+                        "test_type": "SAST",
+                        "version": "1.114.0",
+                        "results": $(cat semgrep-report.json)
+                        }"""
+
+                        writeFile file: 'lambda-payload.json', text: payload
+
+                        // Invoke Lambda function
+                        sh '''
                             export AWS_REGION=$AWS_REGION
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            
+                            aws lambda invoke \
+                                --function-name SaveLogsToCloudWatch \
+                                --payload file://lambda-payload.json \
+                                --region $AWS_REGION \
+                                lambda-response.json
 
-                            aws cloudwatch put-metric-data \
-                                --namespace "Security" \
-                                --metric-name "SAST_Vulnerabilities" \
-                                --value $vulnerabilityCount \
-                                --unit "Count" \
-                                --dimensions "Build=$BUILD_ID" \
-                                --region $AWS_REGION
-                        """
+                            echo "Lambda function invoked. Response:"
+                            cat lambda-response.json
+                        '''
+                        // sh """
+                        //     BUILD_ID=${env.BUILD_ID}
+                        //     export AWS_REGION=$AWS_REGION
+                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                        //     aws cloudwatch put-metric-data \
+                        //         --namespace "Wagtail_Security" \
+                        //         --metric-name "SAST_Vulnerabilities" \
+                        //         --value $vulnerabilityCount \
+                        //         --unit "Count" \
+                        //         --dimensions "Build=$BUILD_ID" \
+                        //         --region $AWS_REGION
+                        // """
                     }
                 }
             }
@@ -88,20 +115,21 @@ pipeline {
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
 
                         //Send the number of vulnerabilities to CloudWatch
-                        sh """
-                            BUILD_ID=${env.BUILD_ID}
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
-                            aws cloudwatch put-metric-data \
-                                --namespace "Security" \
-                                --metric-name "DepScan_Vulnerabilities" \
-                                --value $vulnerabilityCount \
-                                --unit "Count" \
-                                --dimensions "Build=$BUILD_ID" \
-                                --region $AWS_REGION
-                        """
+                        // sh """
+                        //     BUILD_ID=${env.BUILD_ID}
+                        //     export AWS_REGION=$AWS_REGION
+                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                        //     aws cloudwatch put-metric-data \
+                        //         --namespace "Wagtail_Security" \
+                        //         --metric-name "DepScan_Vulnerabilities" \
+                        //         --value $vulnerabilityCount \
+                        //         --unit "Count" \
+                        //         --dimensions "Build=$BUILD_ID" \
+                        //         --region $AWS_REGION
+                        // """
                     }
                 }
             }
