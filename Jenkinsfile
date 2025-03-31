@@ -54,9 +54,9 @@ pipeline {
                                 test_type: "SAST",
                                 version: "1.114.0",
                                 results: .
-                            }' semgrep-report.json > lambda-payload.json
+                            }' semgrep-report.json > lambda-semgrep-payload.json
                         '''
-                        archiveArtifacts artifacts: 'lambda-payload.json', fingerprint: true
+                        archiveArtifacts artifacts: 'lambda-semgrep-payload.json', fingerprint: true
 
                         // Invoke Lambda function
                         sh '''
@@ -65,7 +65,7 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
                             # Ensure the JSON payload is properly formatted
-                            jq . lambda-payload.json > /dev/null
+                            jq . lambda-semgrep-payload.json > /dev/null
                             if [ $? -ne 0 ]; then
                                 echo "Invalid JSON payload!"
                                 exit 1
@@ -73,10 +73,10 @@ pipeline {
 
                             aws lambda invoke \
                                 --function-name SaveLogsToCloudWatch \
-                                --payload file://lambda-payload.json \
+                                --payload file://lambda-semgrep-payload.json \
                                 --region $AWS_REGION \
                                 --cli-binary-format raw-in-base64-out \
-                                lambda-response.json
+                                lambda-semgrep-response.json
 
                             if [ $? -ne 0 ]; then
                                 echo "Lambda invocation failed!"
@@ -85,7 +85,7 @@ pipeline {
                             
 
                             echo "Lambda function invoked. Response:"
-                            cat lambda-response.json
+                            cat lambda-semgrep-response.json
                         '''
                         // sh """
                         //     BUILD_ID=${env.BUILD_ID}
@@ -128,6 +128,48 @@ pipeline {
                         // Fetch the number of vulnerabilities from the safety report
                         def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+
+                        // Prepare JSON payload for Lambda function
+                        sh '''
+                            jq -c --arg build_number "$BUILD_ID" '{
+                                application_language: "Wagtail",
+                                build_number: $build_number,
+                                test_type: "DepScan",
+                                version: "1.114.0",
+                                results: .
+                            }' safety-report.json > lambda-safety-payload.json
+                        '''
+                        archiveArtifacts artifacts: 'lambda-safety-payload.json', fingerprint: true
+
+                        // Invoke Lambda function
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                            # Ensure the JSON payload is properly formatted
+                            jq . lambda-safety-payload.json > /dev/null
+                            if [ $? -ne 0 ]; then
+                                echo "Invalid JSON payload!"
+                                exit 1
+                            fi
+
+                            aws lambda invoke \
+                                --function-name SaveLogsToCloudWatch \
+                                --payload file://lambda-safety-payload.json \
+                                --region $AWS_REGION \
+                                --cli-binary-format raw-in-base64-out \
+                                lambda-safety-response.json
+
+                            if [ $? -ne 0 ]; then
+                                echo "Lambda invocation failed!"
+                                exit 1
+                            fi
+                            
+
+                            echo "Lambda function invoked. Response:"
+                            cat lambda-safety-response.json
+                        '''
 
                         //Send the number of vulnerabilities to CloudWatch
 
