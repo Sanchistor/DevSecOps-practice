@@ -72,7 +72,7 @@ pipeline {
 
                             aws lambda invoke \
                                 --function-name SaveLogsToCloudWatch \
-                                --payload file://<(jq -c . lambda-payload.json) \
+                                --payload file://lambda-payload.json \
                                 --region $AWS_REGION \
                                 --cli-binary-format raw-in-base64-out \
                                 lambda-response.json
