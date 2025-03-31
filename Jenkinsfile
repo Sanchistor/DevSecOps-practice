@@ -53,7 +53,7 @@ pipeline {
                                 "build_number": "'"${BUILD_ID}"'",
                                 "test_type": "SAST",
                                 "version": "1.114.0",
-                                "results": '$(cat semgrep-report.json)'
+                                "results": '$(jq -c . semgrep-report.json)'
                             }' > lambda-payload.json
                         '''
 
