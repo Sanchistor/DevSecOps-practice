@@ -67,7 +67,14 @@ pipeline {
                                 --function-name SaveLogsToCloudWatch \
                                 --payload file://lambda-payload.json \
                                 --region $AWS_REGION \
+                                --cli-binary-format raw-in-base64-out \
                                 lambda-response.json
+                                
+                            if [ $? -ne 0 ]; then
+                                echo "Lambda invocation failed!"
+                                exit 1
+                            fi
+                            
 
                             echo "Lambda function invoked. Response:"
                             cat lambda-response.json
