@@ -9,6 +9,7 @@ pipeline {
         HELM_RELEASE_NAME = 'wagtail-release'
         CLUSTER_NAME = 'MYAPP-EKS'
         SAFETY_API_KEY = credentials('safety-api-key')
+        TARGET_URL = 'https://wagtail.example.com'
     }
 
     stages {
@@ -241,6 +242,27 @@ pipeline {
                             helm status $HELM_RELEASE_NAME --namespace $KUBE_NAMESPACE
                         '''
                     }
+                }
+            }
+        }
+
+        stage('Run DAST Scan with OWASP ZAP') {
+            steps {
+                script {
+                    sh '''
+                        echo "Running OWASP ZAP Baseline Scan on $TARGET_URL..."
+
+                        docker run --rm -v $(pwd):/zap/wrk/:rw owasp/zap2docker-stable zap-baseline.py \
+                            -t $TARGET_URL \
+                            -r zap-report.html \
+                            -J zap-report.json || true
+
+                        archiveArtifacts artifacts: 'zap-report.json', fingerprint: true
+                    '''
+
+                    // Extract vulnerabilities count
+                    def vulnerabilityCount = sh(script: 'jq ".site[].alerts | length" zap-report.json', returnStdout: true).trim()
+                    echo "Number of vulnerabilities found: ${vulnerabilityCount}"
                 }
             }
         }
