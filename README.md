@@ -1,46 +1,13 @@
 # DevSecOps
 
 ## Overview
-This repository provides a **practical DevSecOps solution** integrating **Jenkins, Terraform, AWS (EKS, ECR, S3, VPN), and Helm** for secure, automated CI/CD pipelines. This setup enables seamless hybrid cloud deployment, secure infrastructure provisioning, and automated application delivery.
+This repository provides a **practical DevSecOps solution** integrating **Jenkins, Terraform, AWS (EKS, ECR, S3, VPN, RDS), and Helm** for secure, automated CI/CD pipelines. This setup enables seamless hybrid cloud deployment, secure infrastructure provisioning, and automated application delivery.
 
-## Features
-- ✅ **Hybrid Cloud CI/CD** – On-prem Jenkins securely deploys to AWS resources.
-- ✅ **Infrastructure as Code (IaC)** – Terraform provisions **EKS, ECR, VPN, and S3**.
-- ✅ **Secure Container Management** – Store and manage Docker images in **Amazon ECR**.
-- ✅ **Automated Deployments** – Deploy applications to **EKS using Helm charts**.
-- ✅ **Least Privilege IAM Roles** – Secure access with **AWS IAM role-based policies**.
-- ✅ **Terraform State Management** – Encrypted **S3 backend with DynamoDB state locking**.
-- ✅ **Auto Cleanup Pipeline** – Automatically **destroy AWS resources after testing**.
+## Hosting ASP .NET Core 7 on Kubernetes
+This project includes the deployment of a **ASP .NET Core 7** API to an **AWS EKS cluster** using **Helm**. The application will connect to **Amazon RDS** for database management. 
 
-## Getting Started
-### **1. Clone the Repository**
-```sh
-git clone https://github.com/Sanchistor/DevSecOps-practice.git
-cd DevSecOps-practice
-```
-
-### **2. Setup AWS Credentials**
-Ensure your AWS credentials are configured for Terraform and Jenkins to access AWS services:
-```sh
-aws configure
-```
-
-### **3. Initialize Terraform & Deploy Resources**
-```sh
-terraform init
-terraform apply -auto-approve
-```
-
-### **4. Configure Jenkins & Run Pipeline**
-- Set up Jenkins with the necessary **plugins** (Terraform, AWS CLI, Docker, Helm, and Kubernetes).
-- Add your AWS credentials to Jenkins.
-- Run the Jenkins pipeline to build and deploy applications securely.
-
-## Cleanup
-To **destroy all AWS resources** after testing:
-```sh
-terraform destroy -auto-approve
-```
-
-🚀 Happy Coding!
-
+### **Deployment Overview**:
+- **Kubernetes Cluster**: Hosted on **AWS EKS**.
+- **Database**: Uses **Amazon RDS** for data persistence.
+- **Helm**: Manages application deployment on **EKS**.
+- **CI/CD**: Utilizes **Jenkins** for building and deploying the Wagtail application.
