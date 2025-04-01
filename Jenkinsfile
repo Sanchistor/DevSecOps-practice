@@ -235,11 +235,14 @@ pipeline {
                                 --namespace $KUBE_NAMESPACE \
                                 --values ./django-chart/values.yaml \
                                 --recreate-pods
+                                
+                            echo "Waiting for pod readiness..."
+                            while [[ $(kubectl get pods -n $KUBE_NAMESPACE -l app=$HELM_RELEASE_NAME -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do
+                                echo "Pod not ready yet. Retrying in 10 seconds..."
+                                sleep 10
+                            done
+                            echo "Pod is now ready!"
 
-                            kubectl get nodes
-                            kubectl get pods -A -o wide
-
-                            helm status $HELM_RELEASE_NAME --namespace $KUBE_NAMESPACE
                         '''
                     }
                 }
@@ -250,7 +253,7 @@ pipeline {
             steps {
                 script {
                     sh '''
-                        docker pull owasp/zap2docker-stable
+                        docker pull ghcr.io/zaproxy/zaproxy:stable
 
                         echo "Running OWASP ZAP Full Scan on $TARGET_URL..."
 
