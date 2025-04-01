@@ -223,6 +223,7 @@ pipeline {
         stage('Run Trivy Docker Image Scan') {
             steps {
                 script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     // Define Docker image variable using environment variables (or manually set them)
                     def DOCKER_IMAGE = "${ECR_REPO}:${IMAGE_TAG}"
                     echo "Running Trivy Scan on Docker image: ${DOCKER_IMAGE}"
@@ -233,7 +234,7 @@ pipeline {
                     """
 
                     // Extract vulnerabilities count from the Trivy report using jq
-                    def trivyVulnerabilityCount = sh(script: 'jq ". | length" trivy-report.json', returnStdout: true).trim()
+                    def trivyVulnerabilityCount = sh(script: 'jq ".Results[].Vulnerabilities | length" trivy-report.json', returnStdout: true).trim()
                     echo "Number of vulnerabilities found in Docker image: ${trivyVulnerabilityCount}"
 
                     // Archive Trivy report
@@ -279,7 +280,8 @@ pipeline {
                             echo "Lambda function invoked. Response:"
                             cat lambda-trivy-response.json
                         '''
-                }
+                    }
+                }   
             }
         }
 
