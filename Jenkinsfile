@@ -235,9 +235,9 @@ pipeline {
                                 --namespace $KUBE_NAMESPACE \
                                 --values ./django-chart/values.yaml \
                                 --recreate-pods
-                                
+
                             echo "Waiting for pod readiness..."
-                            while [[ $(kubectl get pods -n $KUBE_NAMESPACE -l app=$HELM_RELEASE_NAME -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do
+                            while [ "$(kubectl get pods -n $KUBE_NAMESPACE -l app=$HELM_RELEASE_NAME -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]; do
                                 echo "Pod not ready yet. Retrying in 10 seconds..."
                                 sleep 10
                             done
@@ -257,17 +257,18 @@ pipeline {
 
                         echo "Running OWASP ZAP Full Scan on $TARGET_URL..."
 
-                        docker run --rm -v $(pwd):/zap/wrk/:rw owasp/zap2docker-stable zap-full-scan.py \
+                        docker run --rm -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable zap-full-scan.py \
                             -t $TARGET_URL \
                             -r zap-report.html \
                             -J zap-report.json || true
 
-                        archiveArtifacts artifacts: 'zap-report.json', fingerprint: true
+                        
                     '''
 
                     // Extract vulnerabilities count
                     def vulnerabilityCount = sh(script: 'jq ".site[].alerts | length" zap-report.json', returnStdout: true).trim()
                     echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+                    archiveArtifacts artifacts: 'zap-report.json', fingerprint: true
                 }
             }
         }
