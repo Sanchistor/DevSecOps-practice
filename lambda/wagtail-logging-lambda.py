@@ -171,6 +171,73 @@ def SAST_scan(event, apllication_language, build_number, test_type):
 
     return findings
 
+def ImageScan_scan(event, apllication_language, build_number, test_type):
+    results = event.get("results", {}).get("Results", [])
+    findings = []
+
+    for result in results:
+        target = result.get("Target", "unknown-target")
+        vulnerabilities = result.get("Vulnerabilities", [])
+
+        for vulnerability in vulnerabilities:
+            vuln_id = vulnerability.get("VulnerabilityID", "unknown-id")
+            pkg_name = vulnerability.get("PkgName", "unknown-package")
+            installed_version = vulnerability.get("InstalledVersion", "unknown-version")
+            severity = vulnerability.get("Severity", "UNKNOWN")
+            title = vulnerability.get("Title", "No title available")
+            description = vulnerability.get("Description", "No description available")
+            primary_url = vulnerability.get("PrimaryURL", "No URL available")
+            published_date = vulnerability.get("PublishedDate", "unknown-published-date")
+            cve_ids = vulnerability.get("CweIDs", [])
+            
+            # Prepare remediation or fix (if available)
+            references = vulnerability.get("References", [])
+            
+            current_time = datetime.utcnow().isoformat() + "Z"
+
+            finding = {
+                'SchemaVersion': '2018-10-08',
+                'Id': f"{pkg_name}-{vuln_id}",
+                'Title': title,
+                'Description': description,
+                'GeneratorId': "Trivy",
+                'Severity': {
+                    'Label': severity
+                },
+                'Resources': [
+                    {
+                        'Type': 'DockerImage',
+                        'Id': target
+                    }
+                ],
+                'CreatedAt': current_time,
+                'UpdatedAt': current_time,
+                'ProductFields': {
+                    'PackageName': pkg_name,
+                    'InstalledVersion': installed_version,
+                },
+                'Remediation': {
+                    'Text': references
+                },
+                'SourceUrl': primary_url,
+                'CweIDs': cve_ids,
+                'PublishedDate': published_date,
+                'TestType': test_type,
+                'BuildNumber': build_number,
+            }
+
+            findings.append(finding)
+    
+    try:
+        send_to_cloudwatch(findings, apllication_language, build_number, test_type)
+
+    except Exception as e:
+        logger.error(f"Error sending findings to CloudWatch Logs: {e}")
+        raise e
+
+    return findings
+
+
 def lambda_handler(event, context):
     apllication_language = event.get('application_language', 'unknown')
     build_number = event.get('build_number', 'unknown')
@@ -179,6 +246,9 @@ def lambda_handler(event, context):
 
     if test_type == 'DepScan':
         findings = DepScan_scan(event, apllication_language, build_number, test_type)
+
+    if test_type == 'ImageScan':
+        findings = ImageScan_scan(event, apllication_language, build_number, test_type)
     
     if test_type == 'SAST':
         findings = SAST_scan(event, apllication_language, build_number, test_type)
