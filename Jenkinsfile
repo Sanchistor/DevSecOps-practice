@@ -9,7 +9,7 @@ pipeline {
         HELM_RELEASE_NAME = 'wagtail-release'
         CLUSTER_NAME = 'MYAPP-EKS'
         SAFETY_API_KEY = credentials('safety-api-key')
-        TARGET_URL = 'https://wagtail.example.com'
+        TARGET_URL = 'http://a8568afcee77646caadc333c1655a122-1516167197.eu-west-1.elb.amazonaws.com/'
     }
 
     stages {
@@ -250,9 +250,11 @@ pipeline {
             steps {
                 script {
                     sh '''
-                        echo "Running OWASP ZAP Baseline Scan on $TARGET_URL..."
+                        docker pull owasp/zap2docker-stable
 
-                        docker run --rm -v $(pwd):/zap/wrk/:rw owasp/zap2docker-stable zap-baseline.py \
+                        echo "Running OWASP ZAP Full Scan on $TARGET_URL..."
+
+                        docker run --rm -v $(pwd):/zap/wrk/:rw owasp/zap2docker-stable zap-full-scan.py \
                             -t $TARGET_URL \
                             -r zap-report.html \
                             -J zap-report.json || true
