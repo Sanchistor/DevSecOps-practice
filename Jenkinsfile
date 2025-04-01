@@ -90,20 +90,20 @@ pipeline {
                         '''
 
                         //Send data to Amazon Cloudwatch
-                        // sh """
-                        //     BUILD_ID=${env.BUILD_ID}
-                        //     export AWS_REGION=$AWS_REGION
-                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        sh """
+                            BUILD_ID=${env.BUILD_ID}
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
-                        //     aws cloudwatch put-metric-data \
-                        //         --namespace "Wagtail_Security" \
-                        //         --metric-name "SAST_Vulnerabilities" \
-                        //         --value $vulnerabilityCount \
-                        //         --unit "Count" \
-                        //         --dimensions "Build=$BUILD_ID" \
-                        //         --region $AWS_REGION
-                        // """
+                            aws cloudwatch put-metric-data \
+                                --namespace "Wagtail_Security" \
+                                --metric-name "SAST_Vulnerabilities" \
+                                --value $vulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
+                        """
                     }
                 }
             }
@@ -176,20 +176,20 @@ pipeline {
 
                         //Send the number of vulnerabilities to CloudWatch
 
-                        // sh """
-                        //     BUILD_ID=${env.BUILD_ID}
-                        //     export AWS_REGION=$AWS_REGION
-                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        sh """
+                            BUILD_ID=${env.BUILD_ID}
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
-                        //     aws cloudwatch put-metric-data \
-                        //         --namespace "Wagtail_Security" \
-                        //         --metric-name "DepScan_Vulnerabilities" \
-                        //         --value $vulnerabilityCount \
-                        //         --unit "Count" \
-                        //         --dimensions "Build=$BUILD_ID" \
-                        //         --region $AWS_REGION
-                        // """
+                            aws cloudwatch put-metric-data \
+                                --namespace "Wagtail_Security" \
+                                --metric-name "DepScan_Vulnerabilities" \
+                                --value $vulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
+                        """
                     }
                 }
             }
@@ -282,6 +282,21 @@ pipeline {
                             echo "Lambda function invoked. Response:"
                             cat lambda-trivy-response.json
                         '''
+
+                        sh """
+                            BUILD_ID=${env.BUILD_ID}
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                            aws cloudwatch put-metric-data \
+                                --namespace "Wagtail_Security" \
+                                --metric-name "ImageScan_Vulnerabilities" \
+                                --value $trivyVulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
+                        """
                     }
                 }   
             }
