@@ -88,6 +88,8 @@ pipeline {
                             echo "Lambda function invoked. Response:"
                             cat lambda-semgrep-response.json
                         '''
+
+                        //Send data to Amazon Cloudwatch
                         // sh """
                         //     BUILD_ID=${env.BUILD_ID}
                         //     export AWS_REGION=$AWS_REGION
@@ -234,7 +236,7 @@ pipeline {
                     """
 
                     // Extract vulnerabilities count from the Trivy report using jq
-                    def trivyVulnerabilityCount = sh(script: 'jq ".Results[].Vulnerabilities | length" trivy-report.json', returnStdout: true).trim()
+                    def trivyVulnerabilityCount = sh(script: 'jq "[.Results[].Vulnerabilities | length] | add" trivy-report.json', returnStdout: true).trim()
                     echo "Number of vulnerabilities found in Docker image: ${trivyVulnerabilityCount}"
 
                     // Archive Trivy report
