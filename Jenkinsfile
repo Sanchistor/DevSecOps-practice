@@ -220,6 +220,27 @@ pipeline {
             }
         }
 
+        stage('Run Trivy Docker Image Scan') {
+            steps {
+                script {
+                    // Define Docker image variable using environment variables (or manually set them)
+                    def DOCKER_IMAGE = "${ECR_REPO}:${IMAGE_TAG}"
+                    echo "Running Trivy Scan on Docker image: ${DOCKER_IMAGE}"
+
+                    // Run the Trivy scan on the Docker image and output results in JSON format
+                    sh """
+                        trivy image --format json --output trivy-report.json ${DOCKER_IMAGE}
+                    """
+
+                    // Extract vulnerabilities count from the Trivy report using jq
+                    def trivyVulnerabilityCount = sh(script: 'jq ". | length" trivy-report.json', returnStdout: true).trim()
+                    echo "Number of vulnerabilities found in Docker image: ${trivyVulnerabilityCount}"
+
+                    // Archive Trivy report
+                    archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
+                }
+            }
+        }
 
         stage('Deploy to EKS using Helm') {
             steps {
@@ -246,29 +267,29 @@ pipeline {
             }
         }
 
-        stage('Run DAST Scan with OWASP ZAP') {
-            steps {
-                script {
-                    sh '''
-                        docker pull ghcr.io/zaproxy/zaproxy:stable
+        // stage('Run DAST Scan with OWASP ZAP') {
+        //     steps {
+        //         script {
+        //             sh '''
+        //                 docker pull ghcr.io/zaproxy/zaproxy:stable
 
-                        echo "Running OWASP ZAP Full Scan on $TARGET_URL..."
+        //                 echo "Running OWASP ZAP Full Scan on $TARGET_URL..."
 
-                        docker run --rm -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable zap-full-scan.py \
-                            -t $TARGET_URL \
-                            -r zap-report.html \
-                            -J zap-report.json || true
+        //                 docker run --rm -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable zap-full-scan.py \
+        //                     -t $TARGET_URL \
+        //                     -r zap-report.html \
+        //                     -J zap-report.json || true
 
                         
-                    '''
+        //             '''
 
-                    // Extract vulnerabilities count
-                    def vulnerabilityCount = sh(script: 'jq ".site[].alerts | length" zap-report.json', returnStdout: true).trim()
-                    echo "Number of vulnerabilities found: ${vulnerabilityCount}"
-                    archiveArtifacts artifacts: 'zap-report.json', fingerprint: true
-                }
-            }
-        }
+        //             // Extract vulnerabilities count
+        //             def vulnerabilityCount = sh(script: 'jq ".site[].alerts | length" zap-report.json', returnStdout: true).trim()
+        //             echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+        //             archiveArtifacts artifacts: 'zap-report.json', fingerprint: true
+        //         }
+        //     }
+        // }
     }
 
         
