@@ -9,7 +9,7 @@ pipeline {
         HELM_RELEASE_NAME = 'wagtail-release'
         CLUSTER_NAME = 'MYAPP-EKS'
         SAFETY_API_KEY = credentials('safety-api-key')
-        TARGET_URL = 'http://a8568afcee77646caadc333c1655a122-1516167197.eu-west-1.elb.amazonaws.com/'
+        // TARGET_URL = 'http://a8568afcee77646caadc333c1655a122-1516167197.eu-west-1.elb.amazonaws.com/'
     }
 
     stages {
@@ -238,6 +238,47 @@ pipeline {
 
                     // Archive Trivy report
                     archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
+
+                     sh '''
+                            jq -c --arg build_number "$BUILD_ID" '{
+                                application_language: "Wagtail",
+                                build_number: $build_number,
+                                test_type: "ImageScan",
+                                version: "1.114.0",
+                                results: .
+                            }' trivy-report.json > lambda-trivy-payload.json
+                        '''
+                        archiveArtifacts artifacts: 'lambda-trivy-payload.json', fingerprint: true
+
+                        // Invoke Lambda function
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                            # Ensure the JSON payload is properly formatted
+                            jq . lambda-trivy-payload.json > /dev/null
+                            if [ $? -ne 0 ]; then
+                                echo "Invalid JSON payload!"
+                                exit 1
+                            fi
+
+                            aws lambda invoke \
+                                --function-name SaveLogsToCloudWatch \
+                                --payload file://lambda-trivy-payload.json \
+                                --region $AWS_REGION \
+                                --cli-binary-format raw-in-base64-out \
+                                lambda-trivy-response.json
+
+                            if [ $? -ne 0 ]; then
+                                echo "Lambda invocation failed!"
+                                exit 1
+                            fi
+                            
+
+                            echo "Lambda function invoked. Response:"
+                            cat lambda-trivy-response.json
+                        '''
                 }
             }
         }
