@@ -20,7 +20,7 @@ image:
   pullPolicy: Always
 
 aws:
-  secretName: rds-credentials
+  secretName: rds-wagtail-credentials
 
 service:
   type: ClusterIP
