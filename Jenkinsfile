@@ -4,7 +4,9 @@ pipeline {
     environment {
         AWS_REGION = 'eu-west-1'
         KUBE_NAMESPACE = 'wagtail'
-        POSTGRES_DB = credentials('database_name')
+        KUBE_NAMESPACE_ASP = 'aspnet'
+        POSTGRES_WAGTAIL_DB = credentials('database_name')
+        POSTGRES_ASPNET_DB = credentials('database_name-asp')
         POSTGRES_USER = credentials('database-user')
         POSTGRES_PASSWORD = credentials('postgres-password') 
         POSTGRES_PORT = credentials('postgres-port') 
@@ -99,27 +101,45 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
 
-                            #Create namespace to host application
+                            #Create namespace to host wagtail application
                             kubectl create namespace $KUBE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+                            #Create namespace to host aspnet application
+                            kubectl create namespace $KUBE_NAMESPACE_ASP --dry-run=client -o yaml | kubectl apply -f -
                             
-                            #Create secret to retrieve docker images from container registry
+                            #Create secret to retrieve docker images from container registry for wagtail namespace
                             kubectl create secret docker-registry ecr-registry-secret \
-                              --docker-server=$ECR_REPO \
+                              --docker-server=$ECR_REPO \ 
                               --docker-username=AWS \
                               --docker-password=$(aws ecr get-login-password --region $AWS_REGION) \
                               --namespace=$KUBE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+                            
+                            # Create ECR secret for ASP.NET namespace
+                            kubectl create secret docker-registry ecr-registry-secret \
+                            --docker-server=$ECR_REPO \
+                            --docker-username=AWS \
+                            --docker-password=$(aws ecr get-login-password --region $AWS_REGION) \
+                            --namespace=$KUBE_NAMESPACE_ASP --dry-run=client -o yaml | kubectl apply -f -
 
                             #Create secret for database config
-                            kubectl create secret generic rds-credentials \
-                              --from-literal=POSTGRES_DB=$POSTGRES_DB \
+                            kubectl create secret generic rds-wagtail-credentials \
+                              --from-literal=POSTGRES_DB=$POSTGRES_WAGTAIL_DB \
                               --from-literal=POSTGRES_USER=$POSTGRES_USER \
                               --from-literal=POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
                               --from-literal=POSTGRES_HOST=$POSTGRES_HOST \
                               --from-literal=POSTGRES_PORT=$POSTGRES_PORT \
                               --namespace=$KUBE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
+                            kubectl create secret generic rds-asp-credentials \
+                              --from-literal=POSTGRES_DB=$POSTGRES_ASPNET_DB \
+                              --from-literal=POSTGRES_USER=$POSTGRES_USER \
+                              --from-literal=POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+                              --from-literal=POSTGRES_HOST=$POSTGRES_HOST \
+                              --from-literal=POSTGRES_PORT=$POSTGRES_PORT \
+                              --namespace=$KUBE_NAMESPACE_ASP --dry-run=client -o yaml | kubectl apply -f -
+
                             #Verify creation of secrets
-                            kubectl get secrets -n $KUBE_NAMESPACE
+                            kubectl get secrets -A
 
                             # --------------------------------------
                             # Install NGINX Ingress Controller
