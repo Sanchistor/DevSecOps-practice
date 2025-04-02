@@ -3,6 +3,14 @@
 ## Overview
 This repository provides a **practical DevSecOps solution** integrating **Jenkins, Terraform, AWS (EKS, ECR, S3, VPN), and Helm** for secure, automated CI/CD pipelines. This setup enables seamless hybrid cloud deployment, secure infrastructure provisioning, and automated application delivery.
 
+## Branches
+This repository contains multiple branches, each dedicated to a specific aspect of the DevSecOps workflow:
+
+- 🔹 **[asp-deployment](https://github.com/Sanchistor/DevSecOps-practice/tree/asp-deployment)** – Manages the deployment of ASP.NET applications with enabled SAST/DAST/Dependency scanning and Image scanning security validation.
+- 🔹 **[main](https://github.com/Sanchistor/DevSecOps-practice/tree/main)** – The primary branch containing description of production-ready configurations.
+- 🔹 **[provision-resources](https://github.com/Sanchistor/DevSecOps-practice/tree/provion-resources)** – Handles Terraform and Amazon Lambda scripts for provisioning AWS infrastructure that can be destroyed by one button.
+- 🔹 **[wagtail-deployment](https://github.com/Sanchistor/DevSecOps-practice/tree/wagtail-deployment)** – Deploys Wagtail CMS Helm with enabled SAST/DAST/Dependency scanning and Image scanning security validation.
+
 ## Features
 - ✅ **Hybrid Cloud CI/CD** – On-prem Jenkins securely deploys to AWS resources.
 - ✅ **Infrastructure as Code (IaC)** – Terraform provisions **EKS, ECR, VPN, and S3**.
