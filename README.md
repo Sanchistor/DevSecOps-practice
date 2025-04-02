@@ -20,7 +20,6 @@ The repository contains Terraform configurations and resources for setting up va
 - **`ecr.tf`**: Defines the configuration for Amazon ECR (Elastic Container Registry) to store Docker images.
 - **`eks.tf`**: Defines the configuration for the EKS cluster, including VPC, subnets, and node groups.
 - **`iam-roles.tf`**: Defines IAM roles and policies for secure access management.
-- **`load-balancer.tf`**: Configures the load balancer (ALB) for application access.
 - **`provider.tf`**: Contains AWS provider configurations and credentials.
 - **`rds.tf`**: Configures the RDS (Relational Database Service) instance for storing application data.
 - **`security-group-eks.tf`**: Configures security groups for EKS control plane and worker nodes.
