@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.app }}
+    spec:
+      containers:
+        - name: {{ .Values.image.app.container.name }}
+          image: "{{ .Values.image.app.container.image.repository }}:{{ .Values.image.app.container.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.image.app.container.port }}
+          env:
+            - name: {{ .Values.env.postgresDbName.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresDbName.name }}
+            - name: {{ .Values.env.postgresUser.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresUser.name }}
+            - name: {{ .Values.env.postgresPassword.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresPassword.name }}
+            - name: {{ .Values.env.postgresHost.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresHost.name }}
+            - name: {{ .Values.env.postgresPort.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: {{ .Values.env.postgresPort.name }}
+      imagePullSecrets:
+        - name: {{ .Values.image.app.container.image.pullSecrets }}   
+
+
+--- 
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.app }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 80  
+      targetPort: {{ .Values.image.app.container.port }} 
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.app }} 

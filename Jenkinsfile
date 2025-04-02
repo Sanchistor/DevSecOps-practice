@@ -2,48 +2,80 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'riga-services-app:latest'
-        POSTGRES_DB = credentials('database_name')
-        POSTGRES_USER = credentials('database-user')
-        POSTGRES_PASSWORD = credentials('postgres-password') // Reference Jenkins credentials
-        CONNECTION_STRING = "Host=db;Database=${env.POSTGRES_DB};Username=${env.POSTGRES_USER};Password=${env.POSTGRES_PASSWORD};Port=5432;"
+        AWS_REGION = 'eu-west-1'
+        ECR_REPO = '266735847393.dkr.ecr.eu-west-1.amazonaws.com/my-app-ecr'
+        IMAGE_TAG = "asp"
+        KUBE_NAMESPACE = 'aspnet'
+        HELM_RELEASE_NAME = 'asp-release'
+        CLUSTER_NAME = 'MYAPP-EKS'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                // Pull the latest code from GitHub
-                git branch: 'main', url: 'https://github.com/Sanchistor/Riga-Services.API.git'
+                git branch: 'asp-deployment', url: 'https://github.com/Sanchistor/DevSecOps-practice.git'
             }
         }
 
-        stage('Build Docker Image') {
+         stage('Authenticate to AWS ECR') {
             steps {
                 script {
-                    // Build the Docker image
-                    sh "docker build -t ${DOCKER_IMAGE} ."
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Deploy to Docker') {
+        stage('Build and Push Docker Image to ECR') {
             steps {
                 script {
-                    // Bring down existing containers if necessary
-                    sh "docker-compose down"
-
-                    // Create .env file dynamically
-                    writeFile file: '.env', text: """
-                    POSTGRES_DB=${POSTGRES_DB}
-                    POSTGRES_USER=${POSTGRES_USER}
-                    POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-                    CONNECTION_STRING=Host=db;Database=${env.POSTGRES_DB};Username=${env.POSTGRES_USER};Password=${env.POSTGRES_PASSWORD};Port=5432;
-                    """
-
-                    // Run Docker Compose
-                    sh "docker-compose up -d --build"
+                    sh '''
+                        docker build -t $ECR_REPO:$IMAGE_TAG .
+                        docker push $ECR_REPO:$IMAGE_TAG
+                    '''
                 }
             }
+        }
+
+        stage('Deploy to EKS using Helm') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
+
+                            helm upgrade --install $HELM_RELEASE_NAME ./chart \
+                                --namespace $KUBE_NAMESPACE \
+                                --values ./chart/values.yaml \
+                                --recreate-pods
+
+                            echo "Waiting for pod readiness..."
+                            sleep 10
+                            echo "Pod is now ready!"
+
+                        '''
+                    }
+                }
+            }
+        }
+
+        
+
+    post {
+        success {
+            echo 'Pipeline execution completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Attempting to clean up resources...'
         }
     }
 }
