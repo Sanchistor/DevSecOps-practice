@@ -8,6 +8,12 @@ pipeline {
         KUBE_NAMESPACE = 'aspnet'
         HELM_RELEASE_NAME = 'asp-release'
         CLUSTER_NAME = 'MYAPP-EKS'
+        MIGRATIONS_DIR = "Migrations" 
+
+        //DATABASE CONFIG
+        POSTGRES_DB = credentials('database_name-asp')
+        POSTGRES_USER = credentials('database-user')
+        POSTGRES_PASSWORD = credentials('postgres-password')
     }
 
     stages {
@@ -63,6 +69,46 @@ pipeline {
                             echo "Pod is now ready!"
 
                         '''
+                    }
+                }
+            }
+        }
+        stage('Approval Before Applying Migrations') {
+            steps {
+                script {
+                    input message: 'Approve SQL Migrations?', ok: 'Apply Migrations'
+                }
+            }
+        }
+
+         stage('Fetch RDS Endpoint') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        RDS_HOST = sh(script: '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            aws rds describe-db-instances --query "DBInstances[0].Endpoint.Address" --output text
+                        ''', returnStdout: true).trim()
+
+                        echo "RDS Endpoint: ${RDS_HOST}"
+                    }
+                }
+            }
+        }
+
+        stage('Apply SQL Migrations to RDS') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh """
+                            export PGPASSWORD=$POSTGRES_PASSWORD
+                            for sql_file in ${MIGRATIONS_DIR}/*.sql; do
+                                echo "Applying migration: $sql_file"
+                                psql -h ${RDS_HOST} -U ${POSTGRES_USER} -d ${POSTGRES_DB} -f $sql_file
+                            done
+                        """
                     }
                 }
             }

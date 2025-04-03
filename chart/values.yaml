@@ -14,9 +14,10 @@ image:
       name: aspnet-deployment
       image:
         repository: 266735847393.dkr.ecr.eu-west-1.amazonaws.com/my-app-ecr
-        tag: aspnet  
+        tag: asp  
         pullSecrets: ecr-registry-secret
       port: 5000 
+    enviroment: Production
   pullPolicy: Always
 
 aws:
@@ -29,6 +30,7 @@ service:
 
 
 # Setup naming of env variables used for database connection
+# TODO: MODIFY IT ACCORDING TO DOCKER_COMPOSE FILE
 env:
   postgresDbName:
     name: POSTGRES_DB

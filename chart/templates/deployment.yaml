@@ -19,6 +19,8 @@ spec:
           ports:
             - containerPort: {{ .Values.image.app.container.port }}
           env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.image.app.enviroment }}
             - name: {{ .Values.env.postgresDbName.name }}
               valueFrom:
                 secretKeyRef:
@@ -44,6 +46,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.aws.secretName }}
                   key: {{ .Values.env.postgresPort.name }}
+            - name: ConnectionStrings__DefaultConnection
+              value: "Host=$(POSTGRES_HOST);Database=$(POSTGRES_DB);Username=$(POSTGRES_USER);Password=$(POSTGRES_PASSWORD);Port=$(POSTGRES_PORT);"
       imagePullSecrets:
         - name: {{ .Values.image.app.container.image.pullSecrets }}   
 
