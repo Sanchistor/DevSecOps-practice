@@ -109,17 +109,15 @@ pipeline {
                             
                             #Create secret to retrieve docker images from container registry for wagtail namespace
                             kubectl create secret docker-registry ecr-registry-secret \
-                              --docker-server=$ECR_REPO \ 
-                              --docker-username=AWS \
+                              --docker-server=$ECR_REPO --docker-username=AWS \
                               --docker-password=$(aws ecr get-login-password --region $AWS_REGION) \
                               --namespace=$KUBE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
                             
                             # Create ECR secret for ASP.NET namespace
                             kubectl create secret docker-registry ecr-registry-secret \
-                            --docker-server=$ECR_REPO \
-                            --docker-username=AWS \
-                            --docker-password=$(aws ecr get-login-password --region $AWS_REGION) \
-                            --namespace=$KUBE_NAMESPACE_ASP --dry-run=client -o yaml | kubectl apply -f -
+                              --docker-server=$ECR_REPO --docker-username=AWS \
+                              --docker-password=$(aws ecr get-login-password --region $AWS_REGION) \
+                              --namespace=$KUBE_NAMESPACE_ASP --dry-run=client -o yaml | kubectl apply -f -
 
                             #Create secret for database config
                             kubectl create secret generic rds-wagtail-credentials \
