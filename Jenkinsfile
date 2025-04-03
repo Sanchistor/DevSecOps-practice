@@ -104,9 +104,9 @@ pipeline {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                         sh """
                             export PGPASSWORD=$POSTGRES_PASSWORD
-                            for sql_file in ${MIGRATIONS_DIR}/*.sql; do
-                                echo "Applying migration: $sql_file"
-                                psql -h ${RDS_HOST} -U ${POSTGRES_USER} -d ${POSTGRES_DB} -f $sql_file
+                            for sql_file in \$(ls ${MIGRATIONS_DIR}/*.sql); do
+                                echo "Applying migration: \$sql_file"
+                                psql -h ${RDS_HOST} -U ${POSTGRES_USER} -d ${POSTGRES_DB} -f "\$sql_file"
                             done
                         """
                     }
