@@ -70,15 +70,16 @@ pipeline {
                     // Archive Trivy report
                     archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
 
-                     sh '''
-                            jq -c --arg build_number "$BUILD_ID" '{
-                                application_language: $PROJECT_TECHNOLOGY,      
-                                build_number: $build_number,
-                                test_type: "ImageScan",
-                                version: "1.114.0",
-                                results: .
-                            }' trivy-report.json > lambda-trivy-payload.json
-                        '''
+                     sh """
+                        jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
+                            application_language: \$language,
+                            build_number: \$build_number,
+                            test_type: "ImageScan",
+                            version: "1.114.0",
+                            results: .
+                        }' trivy-report.json > lambda-trivy-payload.json
+                    """
+
                         archiveArtifacts artifacts: 'lambda-trivy-payload.json', fingerprint: true
 
                         // Invoke Lambda function
