@@ -33,28 +33,46 @@ pipeline {
                     script {
                         echo "Running SonarQube scan..."
 
-                        // Run the scan
+                        // Run the scan and get task info
+                        def scannerOutput = sh(
+                            script: '''
+                                export PATH=$PATH:/opt/sonar-scanner/bin
+                                sonar-scanner \
+                                    -Dsonar.projectKey=aspnet-api \
+                                    -Dsonar.projectName="AspNet API" \
+                                    -Dsonar.projectVersion=1.0 \
+                                    -Dsonar.sources=. \
+                                    -Dsonar.exclusions=**/bin/**,**/obj/** \
+                                    -Dsonar.host.url=http://localhost:9000 \
+                                    -Dsonar.login=$SONAR_TOKEN
+                            ''',
+                            returnStdout: true
+                        )
+
+                        // Extract ceTaskId from scanner output (fallback in case of direct extraction)
+                        def ceTaskId = sh(script: '''
+                            curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/ce/component?component=aspnet-api" | jq -r '.current.taskId'
+                        ''', returnStdout: true).trim()
+
+                        // Wait for the background task to complete
+                        timeout(time: 2, unit: 'MINUTES') {
+                            waitUntil {
+                                def status = sh(script: """
+                                    curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/ce/task?id=${ceTaskId}" | jq -r .task.status
+                                """, returnStdout: true).trim()
+                                echo "SonarQube task status: ${status}"
+                                return (status == "SUCCESS")
+                            }
+                        }
+
+                        // Get real vulnerabilities from SonarQube API
                         sh '''
-                            export PATH=$PATH:/opt/sonar-scanner/bin
-                            sonar-scanner \
-                                -Dsonar.projectKey=aspnet-api \
-                                -Dsonar.projectName="AspNet API" \
-                                -Dsonar.projectVersion=1.0 \
-                                -Dsonar.sources=. \
-                                -Dsonar.exclusions=**/bin/**,**/obj/** \
-                                -Dsonar.host.url=http://localhost:9000 \
-                                -Dsonar.login=$SONAR_TOKEN || true
+                            curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/issues/search?componentKeys=aspnet-api&types=VULNERABILITY" > sonarqube-report.json
                         '''
 
-                        // OPTIONAL: If you're extracting vulnerability counts via API or static JSON
-                        // Here you'd generate `sonarqube-report.json` if needed
-                        // For now we mock it to simulate the next steps
-                        sh 'echo \'{"results":[{"type":"VULNERABILITY"}]}\' > sonarqube-report.json'
-
-                        // Archive the mock or real report
                         archiveArtifacts artifacts: 'sonarqube-report.json', fingerprint: true
 
-                        def vulnerabilityCount = sh(script: 'jq ".results | length" sonarqube-report.json', returnStdout: true).trim()
+                        def vulnerabilityCount = sh(script: 'jq ".issues | length" sonarqube-report.json', returnStdout: true).trim()
                         echo "Number of vulnerabilities found: ${vulnerabilityCount}"
 
                         // Prepare JSON payload for Lambda
@@ -64,9 +82,10 @@ pipeline {
                                 build_number: \$build_number,
                                 test_type: "SAST",
                                 version: "1.114.0",
-                                results: .
+                                results: .issues
                             }' sonarqube-report.json > lambda-sonarqube-payload.json
                         """
+
                         archiveArtifacts artifacts: 'lambda-sonarqube-payload.json', fingerprint: true
                     }
                 }
