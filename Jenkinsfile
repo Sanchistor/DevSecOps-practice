@@ -15,6 +15,9 @@ pipeline {
         POSTGRES_DB = credentials('database_name-asp')
         POSTGRES_USER = credentials('database-user')
         POSTGRES_PASSWORD = credentials('postgres-password')
+        
+        //Migrations approve stage env
+        PROCEED_WITH_MIGRATIONS = 'true'
     }
 
     stages {
@@ -119,7 +122,7 @@ pipeline {
                             echo "Lambda function invoked. Response:"
                             cat lambda-sonarqube-response.json
                         '''
-                        
+
                         //Send data to Amazon Cloudwatch
                         sh """
                             BUILD_ID=${env.BUILD_ID}
@@ -273,12 +276,21 @@ pipeline {
         stage('Approval Before Applying Migrations') {
             steps {
                 script {
-                    input message: 'Approve SQL Migrations?', ok: 'Apply Migrations'
+                    try {
+                        input message: 'Approve SQL Migrations?', ok: 'Apply Migrations'
+                        env.PROCEED_WITH_MIGRATIONS = 'true'
+                    } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+                        echo "SQL Migrations approval aborted. Skipping migration stages."
+                        env.PROCEED_WITH_MIGRATIONS = 'false'
+                    }
                 }
             }
         }
 
          stage('Fetch RDS Endpoint') {
+            when {
+                expression { return env.PROCEED_WITH_MIGRATIONS == 'true' }
+            }
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
@@ -296,6 +308,9 @@ pipeline {
         }
 
         stage('Apply SQL Migrations to RDS') {
+            when {
+                expression { return env.PROCEED_WITH_MIGRATIONS == 'true' }
+            }
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
