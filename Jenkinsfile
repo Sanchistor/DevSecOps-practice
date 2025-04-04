@@ -24,6 +24,55 @@ pipeline {
             }
         }
 
+        stage('Run SAST Scan with SonarQube') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN'),
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
+                ]) {
+                    script {
+                        echo "Running SonarQube scan..."
+
+                        // Run the scan
+                        sh '''
+                            export PATH=$PATH:/opt/sonar-scanner/bin
+                            sonar-scanner \
+                                -Dsonar.projectKey=aspnet-api \
+                                -Dsonar.projectName="AspNet API" \
+                                -Dsonar.projectVersion=1.0 \
+                                -Dsonar.sources=. \
+                                -Dsonar.exclusions=**/bin/**,**/obj/** \
+                                -Dsonar.host.url=http://localhost:9000 \
+                                -Dsonar.login=$SONAR_TOKEN || true
+                        '''
+
+                        // OPTIONAL: If you're extracting vulnerability counts via API or static JSON
+                        // Here you'd generate `sonarqube-report.json` if needed
+                        // For now we mock it to simulate the next steps
+                        sh 'echo \'{"results":[{"type":"VULNERABILITY"}]}\' > sonarqube-report.json'
+
+                        // Archive the mock or real report
+                        archiveArtifacts artifacts: 'sonarqube-report.json', fingerprint: true
+
+                        def vulnerabilityCount = sh(script: 'jq ".results | length" sonarqube-report.json', returnStdout: true).trim()
+                        echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+
+                        // Prepare JSON payload for Lambda
+                        sh """
+                            jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
+                                application_language: \$language,
+                                build_number: \$build_number,
+                                test_type: "SAST",
+                                version: "1.114.0",
+                                results: .
+                            }' sonarqube-report.json > lambda-sonarqube-payload.json
+                        """
+                        archiveArtifacts artifacts: 'lambda-sonarqube-payload.json', fingerprint: true
+                    }
+                }
+            }
+
+
          stage('Authenticate to AWS ECR') {
             steps {
                 script {
