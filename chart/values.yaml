@@ -58,7 +58,7 @@ ingress:
   hosts:
     - host: "" 
       paths:
-        - path: /wagtail
+        - path: /
           pathType: Prefix
   tls: []
 
