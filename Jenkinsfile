@@ -89,6 +89,51 @@ pipeline {
                         """
 
                         archiveArtifacts artifacts: 'lambda-sonarqube-payload.json', fingerprint: true
+
+                        // Invoke Lambda function
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                            # Ensure the JSON payload is properly formatted
+                            jq . lambda-sonarqube-payload.json > /dev/null
+                            if [ $? -ne 0 ]; then
+                                echo "Invalid JSON payload!"
+                                exit 1
+                            fi
+
+                            aws lambda invoke \
+                                --function-name SaveLogsToCloudWatch \
+                                --payload file://lambda-sonarqube-payload.json \
+                                --region $AWS_REGION \
+                                --cli-binary-format raw-in-base64-out \
+                                lambda-sonarqube-response.json
+
+                            if [ $? -ne 0 ]; then
+                                echo "Lambda invocation failed!"
+                                exit 1
+                            fi
+                            
+
+                            echo "Lambda function invoked. Response:"
+                            cat lambda-sonarqube-response.json
+                        '''
+                        
+                        //Send data to Amazon Cloudwatch
+                        sh """
+                            BUILD_ID=${env.BUILD_ID}
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                            aws cloudwatch put-metric-data \
+                                --namespace $PROJECT_TECHNOLOGY --metric-name "SAST_Vulnerabilities" \
+                                --value $vulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
+                        """
                     }
                 }
             }
