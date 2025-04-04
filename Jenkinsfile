@@ -27,7 +27,7 @@ pipeline {
         stage('Run SAST Scan with SonarQube') {
             steps {
                 withCredentials([
-                    string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN'),
+                    string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN'),
                     [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
                 ]) {
                     script {
