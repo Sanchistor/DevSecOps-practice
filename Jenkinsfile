@@ -49,16 +49,18 @@ pipeline {
                             returnStdout: true
                         )
 
-                        // Extract ceTaskId from scanner output (fallback in case of direct extraction)
-                        def ceTaskId = sh(script: '''
-                            curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/ce/component?component=aspnet-api" | jq -r '.current.taskId'
-                        ''', returnStdout: true).trim()
+                        // Extract ceTaskId from report-task.txt
+                        def ceTaskId = sh(
+                            script: "grep 'ceTaskId' .scannerwork/report-task.txt | cut -d'=' -f2",
+                            returnStdout: true
+                        ).trim()
+                        echo "Extracted ceTaskId: ${ceTaskId}"
 
-                        // Wait for the background task to complete
+                        // Wait for background analysis task to complete
                         timeout(time: 2, unit: 'MINUTES') {
                             waitUntil {
                                 def status = sh(script: """
-                                    curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/ce/task?id=${ceTaskId}" | jq -r .task.status
+                                    curl -s -u ${SONAR_TOKEN}: http://localhost:9000/api/ce/task?id=${ceTaskId} | jq -r .task.status
                                 """, returnStdout: true).trim()
                                 echo "SonarQube task status: ${status}"
                                 return (status == "SUCCESS")
