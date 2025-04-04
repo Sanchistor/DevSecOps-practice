@@ -118,8 +118,7 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
 
                             aws cloudwatch put-metric-data \
-                                --namespace $PROJECT_TECHNOLOGY \                       
-                                --metric-name "ImageScan_Vulnerabilities" \
+                                --namespace $PROJECT_TECHNOLOGY --metric-name "ImageScan_Vulnerabilities" \
                                 --value $trivyVulnerabilityCount \
                                 --unit "Count" \
                                 --dimensions "Build=$BUILD_ID" \
