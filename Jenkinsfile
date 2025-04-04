@@ -71,6 +71,7 @@ pipeline {
                     }
                 }
             }
+        }
 
 
          stage('Authenticate to AWS ECR') {
