@@ -312,9 +312,9 @@ pipeline {
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                             aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
 
-                            helm upgrade --install $HELM_RELEASE_NAME ./django-chart \
+                            helm upgrade --install $HELM_RELEASE_NAME ./chart \
                                 --namespace $KUBE_NAMESPACE \
-                                --values ./django-chart/values.yaml \
+                                --values ./chart/values.yaml \
                                 --recreate-pods
 
                             echo "Waiting for pod readiness..."
@@ -330,20 +330,14 @@ pipeline {
         // stage('Run DAST Scan with OWASP ZAP') {
         //     steps {
         //         script {
-        //             sh '''
-        //                 docker pull ghcr.io/zaproxy/zaproxy:stable
+        //             sh """
+        //                 echo "Running OWASP ZAP Full Scan on \$TARGET_URL..."
 
-        //                 echo "Running OWASP ZAP Full Scan on $TARGET_URL..."
-
-        //                 docker run --rm -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable zap-full-scan.py \
-        //                     -t $TARGET_URL \
+        //                 zap-full-scan.py -d -t \$TARGET_URL \
         //                     -r zap-report.html \
         //                     -J zap-report.json || true
+        //             """
 
-                        
-        //             '''
-
-        //             // Extract vulnerabilities count
         //             def vulnerabilityCount = sh(script: 'jq ".site[].alerts | length" zap-report.json', returnStdout: true).trim()
         //             echo "Number of vulnerabilities found: ${vulnerabilityCount}"
         //             archiveArtifacts artifacts: 'zap-report.json', fingerprint: true
