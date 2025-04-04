@@ -17,7 +17,7 @@ pipeline {
         POSTGRES_PASSWORD = credentials('postgres-password')
         
         //Migrations approve stage env
-        PROCEED_WITH_MIGRATIONS = 'true'
+        PROCEED_WITH_MIGRATIONS = 'false'
     }
 
     stages {
