@@ -8,9 +8,10 @@ pipeline {
         KUBE_NAMESPACE = 'aspnet'
         HELM_RELEASE_NAME = 'asp-release'
         CLUSTER_NAME = 'MYAPP-EKS'
-        MIGRATIONS_DIR = "Migrations" 
+        PROJECT_TECHNOLOGY = 'AspNet'
 
         //DATABASE CONFIG
+        MIGRATIONS_DIR = "Migrations" 
         POSTGRES_DB = credentials('database_name-asp')
         POSTGRES_USER = credentials('database-user')
         POSTGRES_PASSWORD = credentials('postgres-password')
@@ -46,6 +47,86 @@ pipeline {
                         docker push $ECR_REPO:$IMAGE_TAG
                     '''
                 }
+            }
+        }
+
+         stage('Run Trivy Docker Image Scan') {
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                    // Define Docker image variable using environment variables (or manually set them)
+                    def DOCKER_IMAGE = "${ECR_REPO}:${IMAGE_TAG}"
+                    echo "Running Trivy Scan on Docker image: ${DOCKER_IMAGE}"
+
+                    // Run the Trivy scan on the Docker image and output results in JSON format
+                    sh """
+                        trivy image --format json --output trivy-report.json ${DOCKER_IMAGE}
+                    """
+
+                    // Extract vulnerabilities count from the Trivy report using jq
+                    def trivyVulnerabilityCount = sh(script: 'jq "[.Results[].Vulnerabilities | length] | add" trivy-report.json', returnStdout: true).trim()
+                    echo "Number of vulnerabilities found in Docker image: ${trivyVulnerabilityCount}"
+
+                    // Archive Trivy report
+                    archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
+
+                     sh '''
+                            jq -c --arg build_number "$BUILD_ID" '{
+                                application_language: $PROJECT_TECHNOLOGY,      
+                                build_number: $build_number,
+                                test_type: "ImageScan",
+                                version: "1.114.0",
+                                results: .
+                            }' trivy-report.json > lambda-trivy-payload.json
+                        '''
+                        archiveArtifacts artifacts: 'lambda-trivy-payload.json', fingerprint: true
+
+                        // Invoke Lambda function
+                        sh '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                            # Ensure the JSON payload is properly formatted
+                            jq . lambda-trivy-payload.json > /dev/null
+                            if [ $? -ne 0 ]; then
+                                echo "Invalid JSON payload!"
+                                exit 1
+                            fi
+
+                            aws lambda invoke \
+                                --function-name SaveLogsToCloudWatch \
+                                --payload file://lambda-trivy-payload.json \
+                                --region $AWS_REGION \
+                                --cli-binary-format raw-in-base64-out \
+                                lambda-trivy-response.json
+
+                            if [ $? -ne 0 ]; then
+                                echo "Lambda invocation failed!"
+                                exit 1
+                            fi
+                            
+
+                            echo "Lambda function invoked. Response:"
+                            cat lambda-trivy-response.json
+                        '''
+
+                        sh """
+                            BUILD_ID=${env.BUILD_ID}
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                            aws cloudwatch put-metric-data \
+                                --namespace $PROJECT_TECHNOLOGY \                       
+                                --metric-name "ImageScan_Vulnerabilities" \
+                                --value $trivyVulnerabilityCount \
+                                --unit "Count" \
+                                --dimensions "Build=$BUILD_ID" \
+                                --region $AWS_REGION
+                        """
+                    }
+                }   
             }
         }
 
