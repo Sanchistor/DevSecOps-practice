@@ -63,7 +63,7 @@ def send_to_cloudwatch(findings, apllication_language, build_number, test_type):
         )
         logger.info(f"Successfully sent finding to CloudWatch Logs: {response}")
 
-def DepScan_scan(event, apllication_language, build_number, test_type):
+def DepScan_scan_Safety(event, apllication_language, build_number, test_type):
     findings = []
     projects = event.get("results", {}).get("scan_results", {}).get("projects", [])
     for project in projects:
@@ -121,8 +121,80 @@ def DepScan_scan(event, apllication_language, build_number, test_type):
         raise e
 
     return findings
+
+def DepScan_scan_Snyk(event, apllication_language, build_number, test_type):
+    findings = []
+    # Parsing Snyk results from the event
+    for result in event.get("results", []):
+        vuln_id = result.get("id", "unknown-id")
+        package_name = result.get("packageName", "unknown-package")
+        raw_version = result.get("version", "unknown-version")
+        severity = result.get("severity", "UNKNOWN")
+        description = result.get("description", "No description available")
+        remediation = result.get("remediation", {}).get("recommended", "No recommendation available")
+
+        # Extracting the CVSS score (if available) and setting the severity label
+        cvss_score = result.get("cvssScore", 0)
+        if severity.lower() == "high":
+            severity_label = "HIGH"
+        elif severity.lower() == "medium":
+            severity_label = "MEDIUM"
+        elif severity.lower() == "low":
+            severity_label = "LOW"
+        else:
+            severity_label = "UNKNOWN"
+
+        # Additional information from references and other attributes in the vulnerability
+        references = result.get("references", [])
+        reference_urls = [ref.get("url", "No URL") for ref in references]
+
+        # Create the finding object for each vulnerability
+        current_time = datetime.utcnow().isoformat() + "Z"
+        finding = {
+            'SchemaVersion': '2018-10-08',
+            'Id': f"{package_name}-{vuln_id}",
+            'Title': f"Vulnerability in {package_name}",
+            'Description': f"Vulnerability {vuln_id} affects {package_name} ({description})",
+            'GeneratorId': "DepCheck",
+            'Severity': {
+                'Label': severity_label,
+                'CVSS': cvss_score
+            },
+            'Resources': [
+                {
+                    'Type': 'Dependency',
+                    'Id': package_name
+                }
+            ],
+            'CreatedAt': current_time,
+            'UpdatedAt': current_time,
+            'ProductFields': {
+                'DependencyName': package_name,
+                'DependencyVersion': raw_version,
+                'CVSSScore': cvss_score
+            },
+            'Remediation': {
+                'recommended': remediation,
+            },
+            'TestType': test_type,
+            'BuildNumber': build_number,
+            'References': reference_urls
+        }
+
+        # Add the finding to the list
+        findings.append(finding)
+
+    # Send findings to cloudwatch
+    try:
+        send_to_cloudwatch(findings, apllication_language, build_number, test_type)
+    except Exception as e:
+        logger.error(f"Error sending findings to CloudWatch Logs: {e}")
+        raise e
+
+    return findings
+
               
-def SAST_scan(event, apllication_language, build_number, test_type):
+def SAST_scan_Semgrep(event, apllication_language, build_number, test_type):
     vulnerabilities = event.get("results", {}).get("results", [])
 
     findings = []
@@ -167,6 +239,62 @@ def SAST_scan(event, apllication_language, build_number, test_type):
 
     except Exception as e:
         logger.error(f"Error sending findings to CloudWatch Logs: {e}")
+        raise e
+
+    return findings
+
+def SAST_scan_SonarQube(event, application_language, build_number, test_type):
+    vulnerabilities = event.get("results", [])
+    findings = []
+
+    for vuln in vulnerabilities:
+        current_time = datetime.utcnow().isoformat() + "Z"
+
+        finding = {
+            'SchemaVersion': '2018-10-08',
+            'Id': vuln.get('key', 'Unknown-ID'),
+            'Title': vuln.get('rule', 'Unknown Rule'),
+            'Description': vuln.get('message', 'No message provided'),
+            'GeneratorId': vuln.get('project', 'Unknown Project'),
+            'Severity': {
+                'Label': vuln.get('severity', 'LOW')
+            },
+            'Resources': [
+                {
+                    'Type': 'SourceCode',
+                    'Id': vuln.get('component', 'Unknown Component'),
+                    'Details': {
+                        'File': vuln.get('component'),
+                        'Line': vuln.get('line'),
+                        'Author': vuln.get('author', 'N/A'),
+                        'Scope': vuln.get('scope', 'MAIN'),
+                        'Hash': vuln.get('hash')
+                    }
+                }
+            ],
+            'CreatedAt': current_time,
+            'UpdatedAt': current_time,
+            'ProductFields': {
+                'SonarQubeRule': vuln.get('rule'),
+                'Effort': vuln.get('effort', 'N/A'),
+                'Tags': ','.join(vuln.get('tags', []))
+            },
+            'Remediation': {
+                'Recommendation': {
+                    'Text': vuln.get('message', 'No recommendation')
+                }
+            },
+            'SourceUrl': f"https://sonarqube.riga.services/project/issues?id={vuln.get('project')}&open={vuln.get('key')}",
+            'TestType': test_type,
+            'BuildNumber': build_number
+        }
+
+        findings.append(finding)
+
+    try:
+        send_to_cloudwatch(findings, application_language, build_number, test_type)
+    except Exception as e:
+        logger.error(f"Error sending SonarQube findings to CloudWatch Logs: {e}")
         raise e
 
     return findings
@@ -245,13 +373,19 @@ def lambda_handler(event, context):
     findings = []
 
     if test_type == 'DepScan':
-        findings = DepScan_scan(event, apllication_language, build_number, test_type)
+        if apllication_language == 'Wagtail':
+            findings = DepScan_scan_Safety(event, apllication_language, build_number, test_type)
+        if apllication_language == 'AspNet':
+            findings = DepScan_scan_Snyk(event, apllication_language, build_number, test_type)
 
     if test_type == 'ImageScan':
         findings = ImageScan_scan(event, apllication_language, build_number, test_type)
     
     if test_type == 'SAST':
-        findings = SAST_scan(event, apllication_language, build_number, test_type)
+        if apllication_language == 'Wagtail':
+            findings = SAST_scan_Semgrep(event, apllication_language, build_number, test_type)
+        if apllication_language == 'AspNet':
+            findings = SAST_scan_SonarQube(event, apllication_language, build_number, test_type)
 
     # log the total number of findings
     logger.info(f"Total findings: {len(findings)}")
