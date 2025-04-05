@@ -38,10 +38,9 @@ pipeline {
                 ]) {
                     script {
                         // Running snyk test and capturing output for debugging
-                        try {
                             sh """
                                 snyk auth $SNYK_TOKEN
-                                snyk test --all-projects --json --debug > snyk-report.json
+                                snyk test --all-projects --json > snyk-report.json
                             """
 
                             // Archive the Snyk report for further inspection
@@ -64,14 +63,6 @@ pipeline {
 
                             archiveArtifacts artifacts: 'lambda-snyk-payload.json', fingerprint: true
 
-                            // Uncomment if invoking Lambda and sending data to CloudWatch
-                            // Ensure the payload is valid and send it to Lambda
-                            // ...
-                        } catch (Exception e) {
-                            echo "An error occurred during the Snyk test: ${e.message}"
-                            currentBuild.result = 'FAILURE'
-                            throw e
-                        }
                     }
                 }
             }
