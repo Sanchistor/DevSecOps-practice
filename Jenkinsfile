@@ -34,10 +34,11 @@ pipeline {
             steps {
                 script {
                     // Set the SNYK_TOKEN environment variable for the snyk command
-                    sh """
-                        export SNYK_TOKEN=${SNYK_TOKEN}
-                        snyk test --file=riga.services.csproj --json > snyk-report.json
-                    """
+                    withEnv(["SNYK_TOKEN=${SNYK_TOKEN}"]) {
+                        sh """
+                            snyk test --file=riga.services.csproj --json > snyk-report.json
+                        """
+                    }
 
                     // Archive the Snyk report
                     archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
