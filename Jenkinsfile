@@ -42,13 +42,10 @@ pipeline {
 
                         // Running snyk test and capturing output for debugging
                         try {
-                            echo "Running snyk test..."
-                            def snykResult = sh(script: 'snyk test --file=riga.services.csproj --all-projects --debug --json', returnStdout: true, returnStatus: true)
-
-                            echo "Snyk test output: ${snykResult}"
-                            if (snykResult != 0) {
-                                error("Snyk test failed with exit code ${snykResult}. Please check the report for errors.")
-                            }
+                            sh """
+                                snyk auth $SNYK_TOKEN
+                                snyk test --file=riga.services.csproj --json > snyk-report.json
+                            """
 
                             // Archive the Snyk report for further inspection
                             archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
