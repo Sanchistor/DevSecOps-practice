@@ -30,7 +30,7 @@ pipeline {
             }
         }
 
-        stage('Run Snyk Test') {
+        stage('Run OWASP DC Test') {
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
@@ -40,11 +40,13 @@ pipeline {
 
                         // Run dependency-check on the .csproj file
                         sh """
-                            dependency-check --project "ASP.NET Core 7 Project" \
+                            dependency-check --data /var/lib/jenkins/owasp-data \
+                                            --project "ASP.NET Core 7 Project" \
                                             --scan riga.services.csproj \
                                             --format JSON \
                                             --out dependency-check-report
                         """
+
 
                         // Archive the Dependency-Check report
                         archiveArtifacts artifacts: 'dependency-check-report.json', fingerprint: true
