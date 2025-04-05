@@ -37,73 +37,47 @@ pipeline {
                     [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
                 ]) {
                     script {
-                        sh """
-                            snyk test --file=riga.services.csproj --json > snyk-report.json
-                        """
+                        // Check if the csproj file exists to ensure we're testing the right file
+                        sh 'ls -l riga.services.csproj'
 
-                        // Archive the Snyk report
-                        archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
+                        // Running snyk test and capturing output for debugging
+                        try {
+                            echo "Running snyk test..."
+                            def snykResult = sh(script: 'snyk test --file=riga.services.csproj --json', returnStdout: true, returnStatus: true)
 
-                        // Extract vulnerabilities count from the Snyk report using jq
-                        def snykVulnerabilityCount = sh(script: 'jq ".vulnerabilities | length" snyk-report.json', returnStdout: true).trim()
-                        echo "Number of vulnerabilities found by Snyk: ${snykVulnerabilityCount}"
+                            echo "Snyk test output: ${snykResult}"
+                            if (snykResult != 0) {
+                                error("Snyk test failed with exit code ${snykResult}. Please check the report for errors.")
+                            }
 
-                        // Prepare JSON payload for Lambda
-                        sh """
-                            jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
-                                application_language: \$language,
-                                build_number: \$build_number,
-                                test_type: "SnykTest",
-                                version: "1.114.0",
-                                results: .vulnerabilities
-                            }' snyk-report.json > lambda-snyk-payload.json
-                        """
+                            // Archive the Snyk report for further inspection
+                            archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
 
-                        archiveArtifacts artifacts: 'lambda-snyk-payload.json', fingerprint: true
+                            // Extract vulnerabilities count from the Snyk report using jq
+                            def snykVulnerabilityCount = sh(script: 'jq ".vulnerabilities | length" snyk-report.json', returnStdout: true).trim()
+                            echo "Number of vulnerabilities found by Snyk: ${snykVulnerabilityCount}"
 
-                        // // Invoke Lambda function with the Snyk results
-                        // sh '''
-                        //     export AWS_REGION=$AWS_REGION
-                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            // Prepare JSON payload for Lambda
+                            sh """
+                                jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
+                                    application_language: \$language,
+                                    build_number: \$build_number,
+                                    test_type: "SnykTest",
+                                    version: "1.114.0",
+                                    results: .vulnerabilities
+                                }' snyk-report.json > lambda-snyk-payload.json
+                            """
 
-                        //     # Ensure the JSON payload is properly formatted
-                        //     jq . lambda-snyk-payload.json > /dev/null
-                        //     if [ $? -ne 0 ]; then
-                        //         echo "Invalid JSON payload!"
-                        //         exit 1
-                        //     fi
+                            archiveArtifacts artifacts: 'lambda-snyk-payload.json', fingerprint: true
 
-                        //     aws lambda invoke \
-                        //         --function-name SaveLogsToCloudWatch \
-                        //         --payload file://lambda-snyk-payload.json \
-                        //         --region $AWS_REGION \
-                        //         --cli-binary-format raw-in-base64-out \
-                        //         lambda-snyk-response.json
-
-                        //     if [ $? -ne 0 ]; then
-                        //         echo "Lambda invocation failed!"
-                        //         exit 1
-                        //     fi
-                            
-                        //     echo "Lambda function invoked. Response:"
-                        //     cat lambda-snyk-response.json
-                        // '''
-
-                        // // Send data to Amazon Cloudwatch
-                        // sh """
-                        //     BUILD_ID=${env.BUILD_ID}
-                        //     export AWS_REGION=$AWS_REGION
-                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                        //     aws cloudwatch put-metric-data \
-                        //         --namespace $PROJECT_TECHNOLOGY --metric-name "Snyk_Vulnerabilities" \
-                        //         --value $snykVulnerabilityCount \
-                        //         --unit "Count" \
-                        //         --dimensions "Build=$BUILD_ID" \
-                        //         --region $AWS_REGION
-                        // """
+                            // Uncomment if invoking Lambda and sending data to CloudWatch
+                            // Ensure the payload is valid and send it to Lambda
+                            // ...
+                        } catch (Exception e) {
+                            echo "An error occurred during the Snyk test: ${e.message}"
+                            currentBuild.result = 'FAILURE'
+                            throw e
+                        }
                     }
                 }
             }
