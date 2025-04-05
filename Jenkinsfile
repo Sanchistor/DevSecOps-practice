@@ -43,7 +43,7 @@ pipeline {
                         // Running snyk test and capturing output for debugging
                         try {
                             echo "Running snyk test..."
-                            def snykResult = sh(script: 'snyk test --file=riga.services.csproj --json', returnStdout: true, returnStatus: true)
+                            def snykResult = sh(script: 'snyk test --file=riga.services.csproj --debug --json', returnStdout: true, returnStatus: true)
 
                             echo "Snyk test output: ${snykResult}"
                             if (snykResult != 0) {
