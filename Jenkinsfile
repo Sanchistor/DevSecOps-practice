@@ -32,77 +32,79 @@ pipeline {
 
         stage('Run Snyk Test') {
             steps {
-                script {
-                    // Set the SNYK_TOKEN environment variable for the snyk command
-                    withEnv(["SNYK_TOKEN=${SNYK_TOKEN}"]) {
+                withCredentials([
+                    string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN'),
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
+                ]) {
+                    script {
                         sh """
                             snyk test --file=riga.services.csproj --json > snyk-report.json
                         """
+
+                        // Archive the Snyk report
+                        archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
+
+                        // Extract vulnerabilities count from the Snyk report using jq
+                        def snykVulnerabilityCount = sh(script: 'jq ".vulnerabilities | length" snyk-report.json', returnStdout: true).trim()
+                        echo "Number of vulnerabilities found by Snyk: ${snykVulnerabilityCount}"
+
+                        // Prepare JSON payload for Lambda
+                        sh """
+                            jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
+                                application_language: \$language,
+                                build_number: \$build_number,
+                                test_type: "SnykTest",
+                                version: "1.114.0",
+                                results: .vulnerabilities
+                            }' snyk-report.json > lambda-snyk-payload.json
+                        """
+
+                        archiveArtifacts artifacts: 'lambda-snyk-payload.json', fingerprint: true
+
+                        // // Invoke Lambda function with the Snyk results
+                        // sh '''
+                        //     export AWS_REGION=$AWS_REGION
+                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                        //     # Ensure the JSON payload is properly formatted
+                        //     jq . lambda-snyk-payload.json > /dev/null
+                        //     if [ $? -ne 0 ]; then
+                        //         echo "Invalid JSON payload!"
+                        //         exit 1
+                        //     fi
+
+                        //     aws lambda invoke \
+                        //         --function-name SaveLogsToCloudWatch \
+                        //         --payload file://lambda-snyk-payload.json \
+                        //         --region $AWS_REGION \
+                        //         --cli-binary-format raw-in-base64-out \
+                        //         lambda-snyk-response.json
+
+                        //     if [ $? -ne 0 ]; then
+                        //         echo "Lambda invocation failed!"
+                        //         exit 1
+                        //     fi
+                            
+                        //     echo "Lambda function invoked. Response:"
+                        //     cat lambda-snyk-response.json
+                        // '''
+
+                        // // Send data to Amazon Cloudwatch
+                        // sh """
+                        //     BUILD_ID=${env.BUILD_ID}
+                        //     export AWS_REGION=$AWS_REGION
+                        //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+                        //     aws cloudwatch put-metric-data \
+                        //         --namespace $PROJECT_TECHNOLOGY --metric-name "Snyk_Vulnerabilities" \
+                        //         --value $snykVulnerabilityCount \
+                        //         --unit "Count" \
+                        //         --dimensions "Build=$BUILD_ID" \
+                        //         --region $AWS_REGION
+                        // """
                     }
-
-                    // Archive the Snyk report
-                    archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
-
-                    // Extract vulnerabilities count from the Snyk report using jq
-                    def snykVulnerabilityCount = sh(script: 'jq ".vulnerabilities | length" snyk-report.json', returnStdout: true).trim()
-                    echo "Number of vulnerabilities found by Snyk: ${snykVulnerabilityCount}"
-
-                    // Prepare JSON payload for Lambda
-                    sh """
-                        jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
-                            application_language: \$language,
-                            build_number: \$build_number,
-                            test_type: "SnykTest",
-                            version: "1.114.0",
-                            results: .vulnerabilities
-                        }' snyk-report.json > lambda-snyk-payload.json
-                    """
-
-                    archiveArtifacts artifacts: 'lambda-snyk-payload.json', fingerprint: true
-
-                    // // Invoke Lambda function with the Snyk results
-                    // sh '''
-                    //     export AWS_REGION=$AWS_REGION
-                    //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                    //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                    //     # Ensure the JSON payload is properly formatted
-                    //     jq . lambda-snyk-payload.json > /dev/null
-                    //     if [ $? -ne 0 ]; then
-                    //         echo "Invalid JSON payload!"
-                    //         exit 1
-                    //     fi
-
-                    //     aws lambda invoke \
-                    //         --function-name SaveLogsToCloudWatch \
-                    //         --payload file://lambda-snyk-payload.json \
-                    //         --region $AWS_REGION \
-                    //         --cli-binary-format raw-in-base64-out \
-                    //         lambda-snyk-response.json
-
-                    //     if [ $? -ne 0 ]; then
-                    //         echo "Lambda invocation failed!"
-                    //         exit 1
-                    //     fi
-                        
-                    //     echo "Lambda function invoked. Response:"
-                    //     cat lambda-snyk-response.json
-                    // '''
-
-                    // // Send data to Amazon Cloudwatch
-                    // sh """
-                    //     BUILD_ID=${env.BUILD_ID}
-                    //     export AWS_REGION=$AWS_REGION
-                    //     export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                    //     export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                    //     aws cloudwatch put-metric-data \
-                    //         --namespace $PROJECT_TECHNOLOGY --metric-name "Snyk_Vulnerabilities" \
-                    //         --value $snykVulnerabilityCount \
-                    //         --unit "Count" \
-                    //         --dimensions "Build=$BUILD_ID" \
-                    //         --region $AWS_REGION
-                    // """
                 }
             }
         }
