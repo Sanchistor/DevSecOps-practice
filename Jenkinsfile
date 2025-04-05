@@ -107,7 +107,6 @@ pipeline {
                     }
                 }
             }
-        }
         
 
         stage('Run SAST Scan with SonarQube') {
