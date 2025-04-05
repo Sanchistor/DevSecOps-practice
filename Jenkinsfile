@@ -44,7 +44,7 @@ pipeline {
                         try {
                             sh """
                                 snyk auth $SNYK_TOKEN
-                                snyk test --file=riga.services.csproj --json > snyk-report.json
+                                snyk test --file=riga.services.csproj --json --debug > snyk-report.json
                             """
 
                             // Archive the Snyk report for further inspection
