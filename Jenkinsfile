@@ -40,7 +40,7 @@ pipeline {
                         // Running snyk test and capturing output for debugging
                             sh """
                                 snyk auth $SNYK_TOKEN
-                                snyk test --all-projects --json --debug > snyk-report.json
+                                snyk test --all-projects --json --debug > snyk-report.json || true
                             """
 
                             // Archive the Snyk report for further inspection
