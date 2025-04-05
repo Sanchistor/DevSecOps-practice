@@ -389,5 +389,3 @@ def lambda_handler(event, context):
 
     # log the total number of findings
     logger.info(f"Total findings: {len(findings)}")
-
-    
