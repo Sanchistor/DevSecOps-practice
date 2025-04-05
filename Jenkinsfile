@@ -30,48 +30,53 @@ pipeline {
             }
         }
 
-        stage('Run OWASP DC Test') {
+        stage('Run Snyk Test') {
             steps {
                 withCredentials([
+                    string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN'),
                     [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
                 ]) {
                     script {
-                       echo "Running OWASP Dependency-Check..."
+                        // Running snyk test and capturing output for debugging
+                        try {
+                            sh """
+                                snyk auth $SNYK_TOKEN
+                                snyk test --all-projects --json --debug > snyk-report.json
+                            """
 
-                        // Run dependency-check on the .csproj file
-                        sh """
-                            dependency-check --data /var/lib/jenkins/owasp-data \
-                                            --project "ASP.NET Core 7 Project" \
-                                            --scan riga.services.csproj \
-                                            --format JSON \
-                                            --out dependency-check-report
-                        """
+                            // Archive the Snyk report for further inspection
+                            archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
 
+                            // Extract vulnerabilities count from the Snyk report using jq
+                            def snykVulnerabilityCount = sh(script: 'jq ".vulnerabilities | length" snyk-report.json', returnStdout: true).trim()
+                            echo "Number of vulnerabilities found by Snyk: ${snykVulnerabilityCount}"
 
-                        // Archive the Dependency-Check report
-                        archiveArtifacts artifacts: 'dependency-check-report.json', fingerprint: true
+                            // Prepare JSON payload for Lambda
+                            sh """
+                                jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
+                                    application_language: \$language,
+                                    build_number: \$build_number,
+                                    test_type: "SnykTest",
+                                    version: "1.114.0",
+                                    results: .vulnerabilities
+                                }' snyk-report.json > lambda-snyk-payload.json
+                            """
 
-                        // Extract number of vulnerabilities using jq
-                        def vulnCount = sh(script: 'jq ".dependencies[].vulnerabilities | select(. != null) | length" dependency-check-report.json | paste -sd+ - | bc', returnStdout: true).trim()
-                        echo "Number of vulnerabilities found: ${vulnCount}"
+                            archiveArtifacts artifacts: 'lambda-snyk-payload.json', fingerprint: true
 
-                        // Prepare JSON payload for Lambda
-                        sh """
-                            jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
-                                application_language: \$language,
-                                build_number: \$build_number,
-                                test_type: "DependencyCheck",
-                                version: "1.114.0",
-                                results: .dependencies
-                            }' dependency-check-report.json > lambda-depcheck-payload.json
-                        """
-
-                        archiveArtifacts artifacts: 'lambda-depcheck-payload.json', fingerprint: true
-
+                            // Uncomment if invoking Lambda and sending data to CloudWatch
+                            // Ensure the payload is valid and send it to Lambda
+                            // ...
+                        } catch (Exception e) {
+                            echo "An error occurred during the Snyk test: ${e.message}"
+                            currentBuild.result = 'FAILURE'
+                            throw e
+                        }
                     }
                 }
             }
         }
+        
 
         stage('Run SAST Scan with SonarQube') {
             steps {
