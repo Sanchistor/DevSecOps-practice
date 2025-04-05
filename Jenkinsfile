@@ -15,9 +15,6 @@ pipeline {
         POSTGRES_DB = credentials('database_name-asp')
         POSTGRES_USER = credentials('database-user')
         POSTGRES_PASSWORD = credentials('postgres-password')
-        
-        //Migrations approve stage env
-        PROCEED_WITH_MIGRATIONS = 'false'
 
         //Security tools creedentials
         SNYK_TOKEN = credentials('SNYK_TOKEN')
@@ -320,18 +317,20 @@ pipeline {
                 script {
                     try {
                         input message: 'Approve SQL Migrations?', ok: 'Apply Migrations'
-                        env.PROCEED_WITH_MIGRATIONS = 'true'
+                        // Set the current build description to track approval status
+                        currentBuild.description = 'Migrations Approved'
                     } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
                         echo "SQL Migrations approval aborted. Skipping migration stages."
-                        env.PROCEED_WITH_MIGRATIONS = 'false'
+                        currentBuild.description = 'Migrations Not Approved'
                     }
                 }
             }
         }
 
+
          stage('Fetch RDS Endpoint') {
             when {
-                expression { return env.PROCEED_WITH_MIGRATIONS == 'true' }
+                expression { return currentBuild.description == 'Migrations Approved' }
             }
             steps {
                 script {
@@ -351,7 +350,7 @@ pipeline {
 
         stage('Apply SQL Migrations to RDS') {
             when {
-                expression { return env.PROCEED_WITH_MIGRATIONS == 'true' }
+                expression { return currentBuild.description == 'Migrations Approved' }
             }
             steps {
                 script {
