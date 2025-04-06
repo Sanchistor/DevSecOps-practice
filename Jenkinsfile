@@ -162,6 +162,10 @@ pipeline {
                             
                             kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
                             kubectl get pods -n cert-manager
+                            kubectl wait --namespace cert-manager \
+                                --for=condition=Ready pods \
+                                --selector=app.kubernetes.io/instance=cert-manager \
+                                --timeout=90s
 
                             kubectl apply -f k8s/cluster-issuer.yaml
                             kubectl describe clusterissuer letsencrypt-prod
