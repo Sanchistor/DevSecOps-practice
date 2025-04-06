@@ -1,3 +1,8 @@
+def IMAGE_TAG = ''
+def KUBE_NAMESPACE = ''
+def HELM_RELEASE_NAME = ''
+def PROJECT_TECHNOLOGY = ''
+
 pipeline {
     agent any
 
@@ -5,15 +10,6 @@ pipeline {
         AWS_REGION = 'eu-west-1'
         ECR_REPO = '266735847393.dkr.ecr.eu-west-1.amazonaws.com/my-app-ecr'
         CLUSTER_NAME = 'MYAPP-EKS'
-
-        // IMAGE_TAG = "asp"
-        IMAGE_TAG = ''
-        // KUBE_NAMESPACE = 'aspnet'
-        KUBE_NAMESPACE = ''
-        // HELM_RELEASE_NAME = 'asp-release'
-        HELM_RELEASE_NAME = ''
-        // PROJECT_TECHNOLOGY = 'AspNet'
-        PROJECT_TECHNOLOGY = ''
         PROJECT_LANGUAGE = ''
 
         //DATABASE CONFIG
@@ -42,18 +38,18 @@ pipeline {
 
                     if (fileExists('requirements.txt')) {
                         PROJECT_LANGUAGE = 'wagtail'
-                        env.IMAGE_TAG = 'wagtail'
-                        env.HELM_RELEASE_NAME = 'wagtail-release'
-                        env.KUBE_NAMESPACE = 'wagtail'
-                        env.PROJECT_TECHNOLOGY = 'Wagtail'
+                        IMAGE_TAG = 'wagtail'
+                        HELM_RELEASE_NAME = 'wagtail-release'
+                        KUBE_NAMESPACE = 'wagtail'
+                        PROJECT_TECHNOLOGY = 'Wagtail'
                     } else {
                         csprojFiles = sh(script: 'find . -name "*.csproj" | head -n 1', returnStdout: true).trim()
                         if (csprojFiles) {
                             PROJECT_LANGUAGE = 'aspnet'
-                            env.IMAGE_TAG = 'asp'
-                            env.HELM_RELEASE_NAME = 'asp-release'
-                            env.KUBE_NAMESPACE = 'aspnet'
-                            env.PROJECT_TECHNOLOGY = 'AspNet'
+                            IMAGE_TAG = 'asp'
+                            HELM_RELEASE_NAME = 'asp-release'
+                            KUBE_NAMESPACE = 'aspnet'
+                            PROJECT_TECHNOLOGY = 'AspNet'
                         }
                     }
 
@@ -203,6 +199,9 @@ pipeline {
         }
 
         stage('Build and Push Docker Image to ECR') {
+            environment {
+                IMAGE_TAG = "${IMAGE_TAG}"
+            }
             steps {
                 script {
                     sh '''
@@ -214,6 +213,9 @@ pipeline {
         }
 
          stage('Run Docker Image Scan') {
+            environment {
+                IMAGE_TAG = "${IMAGE_TAG}"
+            }
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
@@ -232,6 +234,10 @@ pipeline {
         }
 
         stage('Deploy to EKS using Helm') {
+            environment {
+                HELM_RELEASE_NAME = "${HELM_RELEASE_NAME}"
+                KUBE_NAMESPACE = "${KUBE_NAMESPACE}"
+            }
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
