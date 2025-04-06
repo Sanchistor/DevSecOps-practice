@@ -12,6 +12,7 @@ def processSecurityArtifact(Map args) {
     def countCommand = args.countCommand
     def outputPayload = "lambda-${testType.toLowerCase()}-payload.json"
     def outputResponse = "lambda-${testType.toLowerCase()}-response.json"
+    def projectTechnology = args.projectTechnology
 
     def vulnCount = sh(script: countCommand, returnStdout: true).trim()
     echo "[$testType] Vulnerabilities found: $vulnCount"
@@ -19,7 +20,7 @@ def processSecurityArtifact(Map args) {
     archiveArtifacts artifacts: file, fingerprint: true
 
     sh """
-        jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
+        jq -c --arg build_number "$BUILD_ID" --arg language "$projectTechnology" '{
             application_language: \$language,
             build_number: \$build_number,
             test_type: "$testType",
@@ -47,7 +48,7 @@ def processSecurityArtifact(Map args) {
         cat $outputResponse
 
         aws cloudwatch put-metric-data \
-            --namespace "$PROJECT_TECHNOLOGY" \
+            --namespace "$projectTechnology" \
             --metric-name "${testType}_Vulnerabilities" \
             --value $vulnCount \
             --unit "Count" \
@@ -151,6 +152,7 @@ pipeline {
                                 file: 'snyk-report.json',
                                 testType: 'DependencyScan',
                                 countCommand: 'jq ".vulnerabilities | length" snyk-report.json'
+                                projectTechnology: $PROJECT_TECHNOLOGY
                             )
 
                         } else if (PROJECT_LANGUAGE == 'nodejs') {
@@ -237,6 +239,7 @@ pipeline {
                                 file: 'sonarqube-report.json',
                                 testType: 'SAST',
                                 countCommand: 'jq ".issues | length" sonarqube-report.json'
+                                projectTechnology: $PROJECT_TECHNOLOGY
                             )
 
                         } else if (PROJECT_LANGUAGE == 'nodejs') {
@@ -298,6 +301,7 @@ pipeline {
                             file: 'trivy-report.json',
                             testType: 'ImageScan',
                             countCommand: 'jq "[.Results[].Vulnerabilities | length] | add" trivy-report.json'
+                            projectTechnology: $PROJECT_TECHNOLOGY
                         )
                     }
                 }   
