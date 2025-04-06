@@ -150,7 +150,7 @@ pipeline {
 
                             processSecurityArtifact(
                                 file: 'snyk-report.json',
-                                testType: 'DependencyScan',
+                                testType: 'DepScan',
                                 countCommand: 'jq ".vulnerabilities | length" snyk-report.json',
                                 projectTechnology: PROJECT_TECHNOLOGY
                             )
