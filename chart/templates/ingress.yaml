@@ -29,10 +29,10 @@ spec:
                   number: {{ $.Values.service.port }}
           {{- end }}
     {{- end }}
-  tls:
-    - hosts:
-        {{- range .Values.ingress.hosts }}
-        - {{ .host | quote }}
-        {{- end }}
-      secretName: {{ .Values.ingress.tlsSecretName }}
+  # tls:
+  #   - hosts:
+  #       {{- range .Values.ingress.hosts }}
+  #       - {{ .host | quote }}
+  #       {{- end }}
+  #     secretName: {{ .Values.ingress.tlsSecretName }}
 {{- end }}
