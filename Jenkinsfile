@@ -78,11 +78,6 @@ pipeline {
     }
 
     stages {
-        stage('Checkout Code') {
-            steps {
-                git branch: 'asp-deployment', url: 'https://github.com/Sanchistor/DevSecOps-practice.git'
-            }
-        }
 
         stage('Detect Project Language') {
             steps {
