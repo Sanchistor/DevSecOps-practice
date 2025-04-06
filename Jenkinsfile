@@ -3,6 +3,59 @@ def KUBE_NAMESPACE = ''
 def HELM_RELEASE_NAME = ''
 def PROJECT_TECHNOLOGY = ''
 
+// ─────────────────────────────
+// Shared Function - Artifact Processor
+// ─────────────────────────────
+def processSecurityArtifact(Map args) {
+    def file = args.file
+    def testType = args.testType
+    def countCommand = args.countCommand
+    def outputPayload = "lambda-${testType.toLowerCase()}-payload.json"
+    def outputResponse = "lambda-${testType.toLowerCase()}-response.json"
+
+    def vulnCount = sh(script: countCommand, returnStdout: true).trim()
+    echo "[$testType] Vulnerabilities found: $vulnCount"
+
+    archiveArtifacts artifacts: file, fingerprint: true
+
+    sh """
+        jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
+            application_language: \$language,
+            build_number: \$build_number,
+            test_type: "$testType",
+            version: "1.0.0",
+            results: .
+        }' $file > $outputPayload
+    """
+
+    archiveArtifacts artifacts: outputPayload, fingerprint: true
+
+    sh """
+        export AWS_REGION=$AWS_REGION
+        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+        jq . $outputPayload > /dev/null || (echo "Invalid JSON payload!" && exit 1)
+
+        aws lambda invoke \
+            --function-name SaveLogsToCloudWatch \
+            --payload file://$outputPayload \
+            --region $AWS_REGION \
+            --cli-binary-format raw-in-base64-out \
+            $outputResponse
+
+        cat $outputResponse
+
+        aws cloudwatch put-metric-data \
+            --namespace "$PROJECT_TECHNOLOGY" \
+            --metric-name "${testType}_Vulnerabilities" \
+            --value $vulnCount \
+            --unit "Count" \
+            --dimensions "Build=$BUILD_ID" \
+            --region $AWS_REGION
+    """
+}
+
 pipeline {
     agent any
 
@@ -94,6 +147,12 @@ pipeline {
                             // Archive the Snyk report for further inspection
                             archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
 
+                            processSecurityArtifact(
+                                file: 'snyk-report.json',
+                                testType: 'DependencyScan',
+                                countCommand: 'jq ".vulnerabilities | length" snyk-report.json'
+                            )
+
                         } else if (PROJECT_LANGUAGE == 'nodejs') {
                             echo "NodeJs Dependecy scanning stage here ..."
                         }
@@ -174,6 +233,12 @@ pipeline {
 
                             archiveArtifacts artifacts: 'sonarqube-report.json', fingerprint: true
 
+                            processSecurityArtifact(
+                                file: 'sonarqube-report.json',
+                                testType: 'SAST',
+                                countCommand: 'jq ".issues | length" sonarqube-report.json'
+                            )
+
                         } else if (PROJECT_LANGUAGE == 'nodejs') {
                             echo "NodeJs SAST scanning stage here ..."
                         }
@@ -228,6 +293,12 @@ pipeline {
                             trivy image --format json --output trivy-report.json ${DOCKER_IMAGE}
                         """
                         archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
+
+                        processSecurityArtifact(
+                            file: 'trivy-report.json',
+                            testType: 'ImageScan',
+                            countCommand: 'jq "[.Results[].Vulnerabilities | length] | add" trivy-report.json'
+                        )
                     }
                 }   
             }
@@ -261,6 +332,8 @@ pipeline {
                 }
             }
         }
+
+
         stage('Approval Before Applying Migrations') {
             steps {
                 script {
