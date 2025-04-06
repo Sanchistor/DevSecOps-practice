@@ -27,6 +27,23 @@ pipeline {
             }
         }
 
+        stage('Detect Project Language') {
+            steps {
+                script {
+                    def projectLanguage = ''
+                    if (fileExists('requirements.txt') || fileExists('setup.py')) {
+                        projectLanguage = 'wagtail'
+                    } else if (fileExists('*.csproj') || fileExists('global.json')) {
+                        projectLanguage = 'aspnet'
+                    } else {
+                        error "Unknown project language, unable to identify!"
+                    }
+                    echo "Detected project language: ${projectLanguage}"
+                    env.PROJECT_LANGUAGE = projectLanguage 
+                }
+            }
+        }
+
         stage('Run Snyk Test') {
             steps {
                 withCredentials([
@@ -36,6 +53,7 @@ pipeline {
                     script {
                         // Running snyk test and capturing output for debugging
                             sh """
+                                echo env.PROJECT_LANGUAGE
                                 snyk auth $SNYK_TOKEN
                                 snyk test --all-projects --json --debug > snyk-report.json || true
                             """
