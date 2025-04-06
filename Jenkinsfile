@@ -152,7 +152,7 @@ pipeline {
                                 file: 'snyk-report.json',
                                 testType: 'DependencyScan',
                                 countCommand: 'jq ".vulnerabilities | length" snyk-report.json'
-                                projectTechnology: $PROJECT_TECHNOLOGY
+                                projectTechnology: PROJECT_TECHNOLOGY
                             )
 
                         } else if (PROJECT_LANGUAGE == 'nodejs') {
@@ -239,7 +239,7 @@ pipeline {
                                 file: 'sonarqube-report.json',
                                 testType: 'SAST',
                                 countCommand: 'jq ".issues | length" sonarqube-report.json'
-                                projectTechnology: $PROJECT_TECHNOLOGY
+                                projectTechnology: PROJECT_TECHNOLOGY
                             )
 
                         } else if (PROJECT_LANGUAGE == 'nodejs') {
@@ -301,7 +301,7 @@ pipeline {
                             file: 'trivy-report.json',
                             testType: 'ImageScan',
                             countCommand: 'jq "[.Results[].Vulnerabilities | length] | add" trivy-report.json'
-                            projectTechnology: $PROJECT_TECHNOLOGY
+                            projectTechnology: PROJECT_TECHNOLOGY
                         )
                     }
                 }   
