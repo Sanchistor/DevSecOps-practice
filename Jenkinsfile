@@ -154,10 +154,10 @@ pipeline {
                             #Install ingress-nginx on K8S cluster
                             helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
                                --namespace ingress-nginx \
-                               --set controller.service.loadBalancerIP=$STATIC_IP
+                               --set controller.service.type=LoadBalancer
 
                             #------------------------------------
-                            #Install cert-manager
+                            # Install cert-manager
                             #------------------------------------
                             
                             kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
