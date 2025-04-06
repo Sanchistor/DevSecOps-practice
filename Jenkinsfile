@@ -10,6 +10,7 @@ pipeline {
         POSTGRES_USER = credentials('database-user')
         POSTGRES_PASSWORD = credentials('postgres-password') 
         POSTGRES_PORT = credentials('postgres-port') 
+        STATIC_IP = '54.195.130.243'
     }
 
     stages {
@@ -153,7 +154,17 @@ pipeline {
                             #Install ingress-nginx on K8S cluster
                             helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
                                --namespace ingress-nginx \
-                               --set controller.service.type=LoadBalancer
+                               --set controller.service.loadBalancerIP=$STATIC_IP
+
+                            #------------------------------------
+                            #Install cert-manager
+                            #------------------------------------
+                            
+                            kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+                            kubectl get pods -n cert-manager
+
+                            kubectl apply -f k8s/cluster-issuer.yaml
+                            kubectl describe clusterissuer letsencrypt-prod
 
                         '''
                     }
