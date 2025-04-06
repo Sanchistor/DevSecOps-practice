@@ -4,11 +4,16 @@ pipeline {
     environment {
         AWS_REGION = 'eu-west-1'
         ECR_REPO = '266735847393.dkr.ecr.eu-west-1.amazonaws.com/my-app-ecr'
-        IMAGE_TAG = "asp"
-        KUBE_NAMESPACE = 'aspnet'
-        HELM_RELEASE_NAME = 'asp-release'
         CLUSTER_NAME = 'MYAPP-EKS'
-        PROJECT_TECHNOLOGY = 'AspNet'
+
+        // IMAGE_TAG = "asp"
+        IMAGE_TAG = ''
+        // KUBE_NAMESPACE = 'aspnet'
+        KUBE_NAMESPACE = ''
+        // HELM_RELEASE_NAME = 'asp-release'
+        HELM_RELEASE_NAME = ''
+        // PROJECT_TECHNOLOGY = 'AspNet'
+        PROJECT_TECHNOLOGY = ''
         PROJECT_LANGUAGE = ''
 
         //DATABASE CONFIG
@@ -19,6 +24,7 @@ pipeline {
 
         //Security tools creedentials
         SNYK_TOKEN = credentials('SNYK_TOKEN')
+        SAFETY_API_KEY = credentials('safety-api-key')
     }
 
     stages {
@@ -34,12 +40,21 @@ pipeline {
                     PROJECT_LANGUAGE = 'Unknown'
                     if (fileExists('requirements.txt')) {
                         PROJECT_LANGUAGE = 'wagtail'
+                        IMAGE_TAG = 'wagtail'
+                        HELM_RELEASE_NAME = 'wagtail-release'
+                        KUBE_NAMESPACE = 'wagtail'
+                        PROJECT_TECHNOLOGY = 'Wagtail'
                     }
+
                     // Check for ASP.NET project files (e.g., .csproj)
                     else {
                         def csprojFiles = sh(script: 'find . -name "*.csproj" | head -n 1', returnStdout: true).trim()
                         if (csprojFiles) {
                             PROJECT_LANGUAGE = 'aspnet'
+                            IMAGE_TAG = 'asp'
+                            HELM_RELEASE_NAME = 'asp-release'
+                            KUBE_NAMESPACE = 'aspnet'
+                            PROJECT_TECHNOLOGY = 'AspNet'
                         }
                     }
 
@@ -49,100 +64,78 @@ pipeline {
             }
         }
 
-        stage('Run Snyk Test') {
+        stage('Run Dependency Scanning Test') {
             steps {
                 withCredentials([
                     string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN'),
                     [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
                 ]) {
                     script {
-                        // Running snyk test and capturing output for debugging
+                        if (PROJECT_LANGUAGE == 'wagtail') {
+                            sh '''
+                            if ! command -v safety &> /dev/null
+                            then
+                                echo "Installing Safety..."
+                                pip install --user safety
+                            fi
+                            # Ensure ~/.local/bin is in the PATH
+                            export PATH=$HOME/.local/bin:$PATH
+                            export SAFETY_API_KEY=${SAFETY_API_KEY}
+
+                            safety scan -r requirements.txt --output json > safety-report.json || true
+                            '''
+                            archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
+
+                        } else if (PROJECT_LANGUAGE == 'aspnet') {
+                            // Running snyk test and capturing output for debugging
                             sh """
-                                echo $PROJECT_LANGUAGE
                                 snyk auth $SNYK_TOKEN
                                 snyk test --all-projects --json --debug > snyk-report.json || true
                             """
-
                             // Archive the Snyk report for further inspection
                             archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
 
-                            // Extract vulnerabilities count from the Snyk report using jq
-                            def vulnerabilityCount = sh(script: 'jq ".vulnerabilities | length" snyk-report.json', returnStdout: true).trim()
-                            echo "Number of vulnerabilities found by Snyk: ${vulnerabilityCount}"
+                        } else if (PROJECT_LANGUAGE == 'nodejs') {
+                            echo "NodeJs Dependecy scanning stage here ..."
+                        }
 
-                            // Prepare JSON payload for Lambda
-                            sh """
-                                jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
-                                    application_language: \$language,
-                                    build_number: \$build_number,
-                                    test_type: "DepScan",
-                                    version: "1.114.0",
-                                    results: .vulnerabilities
-                                }' snyk-report.json > lambda-snyk-payload.json
-                            """
-
-                            archiveArtifacts artifacts: 'lambda-snyk-payload.json', fingerprint: true
-                            // Invoke Lambda function
-                            sh '''
-                                export AWS_REGION=$AWS_REGION
-                                export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                                export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                                # Ensure the JSON payload is properly formatted
-                                jq . lambda-snyk-payload.json > /dev/null
-                                if [ $? -ne 0 ]; then
-                                    echo "Invalid JSON payload!"
-                                    exit 1
-                                fi
-
-                                aws lambda invoke \
-                                    --function-name SaveLogsToCloudWatch \
-                                    --payload file://lambda-snyk-payload.json \
-                                    --region $AWS_REGION \
-                                    --cli-binary-format raw-in-base64-out \
-                                    lambda-snyk-response.json
-
-                                if [ $? -ne 0 ]; then
-                                    echo "Lambda invocation failed!"
-                                    exit 1
-                                fi
-                                
-
-                                echo "Lambda function invoked. Response:"
-                                cat lambda-snyk-response.json
-                            '''
-
-                            //Send data to Amazon Cloudwatch
-                            sh """
-                                BUILD_ID=${env.BUILD_ID}
-                                export AWS_REGION=$AWS_REGION
-                                export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                                export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                                aws cloudwatch put-metric-data \
-                                    --namespace $PROJECT_TECHNOLOGY --metric-name "DepScan_Vulnerabilities" \
-                                    --value $vulnerabilityCount \
-                                    --unit "Count" \
-                                    --dimensions "Build=$BUILD_ID" \
-                                    --region $AWS_REGION
-                            """
                         }
                     }
                 }
             }
         
 
-        stage('Run SAST Scan with SonarQube') {
+        stage('Run SAST Scan') {
             steps {
                 withCredentials([
                     string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN'),
                     [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
                 ]) {
                     script {
-                        echo "Running SonarQube scan..."
+                        if (PROJECT_LANGUAGE == 'wagtail') {
+                            sh '''
+                            # Ensure semgrep is installed if not available
+                            if ! command -v semgrep &> /dev/null
+                            then
+                                echo "semgrep not found, installing..."
+                                pip install --user semgrep
+                            fi
 
-                        // Run the scan and get task info
-                        def scannerOutput = sh(
+                            # Ensure ~/.local/bin is in the PATH
+                            export PATH=$HOME/.local/bin:$PATH
+
+                            # Verify that semgrep is accessible
+                            echo "Checking semgrep version..."
+                            semgrep --version
+
+                            # Run semgrep scan
+                            semgrep scan --config auto --severity INFO --severity WARNING --severity ERROR --json > semgrep-report.json || true
+                            
+                        '''
+                        archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
+
+                        } else if (PROJECT_LANGUAGE == 'aspnet') {
+                            def scannerOutput = sh(
                             script: '''
                                 export PATH=$PATH:/opt/sonar-scanner/bin
                                 sonar-scanner \
@@ -155,93 +148,36 @@ pipeline {
                                     -Dsonar.login=$SONAR_TOKEN
                             ''',
                             returnStdout: true
-                        )
+                            )
 
-                        // Extract ceTaskId from report-task.txt
-                        def ceTaskId = sh(
-                            script: "grep 'ceTaskId' .scannerwork/report-task.txt | cut -d'=' -f2",
-                            returnStdout: true
-                        ).trim()
-                        echo "Extracted ceTaskId: ${ceTaskId}"
+                            // Extract ceTaskId from report-task.txt
+                            def ceTaskId = sh(
+                                script: "grep 'ceTaskId' .scannerwork/report-task.txt | cut -d'=' -f2",
+                                returnStdout: true
+                            ).trim()
+                            echo "Extracted ceTaskId: ${ceTaskId}"
 
-                        // Wait for background analysis task to complete
-                        timeout(time: 2, unit: 'MINUTES') {
-                            waitUntil {
-                                def status = sh(script: """
-                                    curl -s -u ${SONAR_TOKEN}: http://localhost:9000/api/ce/task?id=${ceTaskId} | jq -r .task.status
-                                """, returnStdout: true).trim()
-                                echo "SonarQube task status: ${status}"
-                                return (status == "SUCCESS")
+                            // Wait for background analysis task to complete
+                            timeout(time: 2, unit: 'MINUTES') {
+                                waitUntil {
+                                    def status = sh(script: """
+                                        curl -s -u ${SONAR_TOKEN}: http://localhost:9000/api/ce/task?id=${ceTaskId} | jq -r .task.status
+                                    """, returnStdout: true).trim()
+                                    echo "SonarQube task status: ${status}"
+                                    return (status == "SUCCESS")
+                                }
                             }
+
+                            // Get real vulnerabilities from SonarQube API
+                            sh '''
+                                curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/issues/search?componentKeys=aspnet-api&types=VULNERABILITY" > sonarqube-report.json
+                            '''
+
+                            archiveArtifacts artifacts: 'sonarqube-report.json', fingerprint: true
+
+                        } else if (PROJECT_LANGUAGE == 'nodejs') {
+                            echo "NodeJs SAST scanning stage here ..."
                         }
-
-                        // Get real vulnerabilities from SonarQube API
-                        sh '''
-                            curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/issues/search?componentKeys=aspnet-api&types=VULNERABILITY" > sonarqube-report.json
-                        '''
-
-                        archiveArtifacts artifacts: 'sonarqube-report.json', fingerprint: true
-
-                        def vulnerabilityCount = sh(script: 'jq ".issues | length" sonarqube-report.json', returnStdout: true).trim()
-                        echo "Number of vulnerabilities found: ${vulnerabilityCount}"
-
-                        // Prepare JSON payload for Lambda
-                        sh """
-                            jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
-                                application_language: \$language,
-                                build_number: \$build_number,
-                                test_type: "SAST",
-                                version: "1.114.0",
-                                results: .issues
-                            }' sonarqube-report.json > lambda-sonarqube-payload.json
-                        """
-
-                        archiveArtifacts artifacts: 'lambda-sonarqube-payload.json', fingerprint: true
-
-                        // Invoke Lambda function
-                        sh '''
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            # Ensure the JSON payload is properly formatted
-                            jq . lambda-sonarqube-payload.json > /dev/null
-                            if [ $? -ne 0 ]; then
-                                echo "Invalid JSON payload!"
-                                exit 1
-                            fi
-
-                            aws lambda invoke \
-                                --function-name SaveLogsToCloudWatch \
-                                --payload file://lambda-sonarqube-payload.json \
-                                --region $AWS_REGION \
-                                --cli-binary-format raw-in-base64-out \
-                                lambda-sonarqube-response.json
-
-                            if [ $? -ne 0 ]; then
-                                echo "Lambda invocation failed!"
-                                exit 1
-                            fi
-                            
-
-                            echo "Lambda function invoked. Response:"
-                            cat lambda-sonarqube-response.json
-                        '''
-
-                        //Send data to Amazon Cloudwatch
-                        sh """
-                            BUILD_ID=${env.BUILD_ID}
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            aws cloudwatch put-metric-data \
-                                --namespace $PROJECT_TECHNOLOGY --metric-name "SAST_Vulnerabilities" \
-                                --value $vulnerabilityCount \
-                                --unit "Count" \
-                                --dimensions "Build=$BUILD_ID" \
-                                --region $AWS_REGION
-                        """
                     }
                 }
             }
@@ -274,81 +210,19 @@ pipeline {
             }
         }
 
-         stage('Run Trivy Docker Image Scan') {
+         stage('Run Docker Image Scan') {
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                    // Define Docker image variable using environment variables (or manually set them)
-                    def DOCKER_IMAGE = "${ECR_REPO}:${IMAGE_TAG}"
-                    echo "Running Trivy Scan on Docker image: ${DOCKER_IMAGE}"
+                        // Define Docker image variable using environment variables (or manually set them)
+                        def DOCKER_IMAGE = "${ECR_REPO}:${IMAGE_TAG}"
+                        echo "Running Trivy Scan on Docker image: ${DOCKER_IMAGE}"
 
-                    // Run the Trivy scan on the Docker image and output results in JSON format
-                    sh """
-                        trivy image --format json --output trivy-report.json ${DOCKER_IMAGE}
-                    """
-
-                    // Extract vulnerabilities count from the Trivy report using jq
-                    def trivyVulnerabilityCount = sh(script: 'jq "[.Results[].Vulnerabilities | length] | add" trivy-report.json', returnStdout: true).trim()
-                    echo "Number of vulnerabilities found in Docker image: ${trivyVulnerabilityCount}"
-
-                    // Archive Trivy report
-                    archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
-
-                     sh """
-                        jq -c --arg build_number "$BUILD_ID" --arg language "$PROJECT_TECHNOLOGY" '{
-                            application_language: \$language,
-                            build_number: \$build_number,
-                            test_type: "ImageScan",
-                            version: "1.114.0",
-                            results: .
-                        }' trivy-report.json > lambda-trivy-payload.json
-                    """
-
-                        archiveArtifacts artifacts: 'lambda-trivy-payload.json', fingerprint: true
-
-                        // Invoke Lambda function
-                        sh '''
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            # Ensure the JSON payload is properly formatted
-                            jq . lambda-trivy-payload.json > /dev/null
-                            if [ $? -ne 0 ]; then
-                                echo "Invalid JSON payload!"
-                                exit 1
-                            fi
-
-                            aws lambda invoke \
-                                --function-name SaveLogsToCloudWatch \
-                                --payload file://lambda-trivy-payload.json \
-                                --region $AWS_REGION \
-                                --cli-binary-format raw-in-base64-out \
-                                lambda-trivy-response.json
-
-                            if [ $? -ne 0 ]; then
-                                echo "Lambda invocation failed!"
-                                exit 1
-                            fi
-                            
-
-                            echo "Lambda function invoked. Response:"
-                            cat lambda-trivy-response.json
-                        '''
-
+                        // Run the Trivy scan on the Docker image and output results in JSON format
                         sh """
-                            BUILD_ID=${env.BUILD_ID}
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            aws cloudwatch put-metric-data \
-                                --namespace $PROJECT_TECHNOLOGY --metric-name "ImageScan_Vulnerabilities" \
-                                --value $trivyVulnerabilityCount \
-                                --unit "Count" \
-                                --dimensions "Build=$BUILD_ID" \
-                                --region $AWS_REGION
+                            trivy image --format json --output trivy-report.json ${DOCKER_IMAGE}
                         """
+                        archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
                     }
                 }   
             }
