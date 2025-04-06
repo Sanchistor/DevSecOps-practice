@@ -37,32 +37,35 @@ pipeline {
         stage('Detect Project Language') {
             steps {
                 script {
+                    def csprojFiles = ''
                     PROJECT_LANGUAGE = 'Unknown'
+
                     if (fileExists('requirements.txt')) {
                         PROJECT_LANGUAGE = 'wagtail'
-                        IMAGE_TAG = 'wagtail'
-                        HELM_RELEASE_NAME = 'wagtail-release'
-                        KUBE_NAMESPACE = 'wagtail'
-                        PROJECT_TECHNOLOGY = 'Wagtail'
-                    }
-
-                    // Check for ASP.NET project files (e.g., .csproj)
-                    else {
-                        def csprojFiles = sh(script: 'find . -name "*.csproj" | head -n 1', returnStdout: true).trim()
+                        env.IMAGE_TAG = 'wagtail'
+                        env.HELM_RELEASE_NAME = 'wagtail-release'
+                        env.KUBE_NAMESPACE = 'wagtail'
+                        env.PROJECT_TECHNOLOGY = 'Wagtail'
+                    } else {
+                        csprojFiles = sh(script: 'find . -name "*.csproj" | head -n 1', returnStdout: true).trim()
                         if (csprojFiles) {
                             PROJECT_LANGUAGE = 'aspnet'
-                            IMAGE_TAG = 'asp'
-                            HELM_RELEASE_NAME = 'asp-release'
-                            KUBE_NAMESPACE = 'aspnet'
-                            PROJECT_TECHNOLOGY = 'AspNet'
+                            env.IMAGE_TAG = 'asp'
+                            env.HELM_RELEASE_NAME = 'asp-release'
+                            env.KUBE_NAMESPACE = 'aspnet'
+                            env.PROJECT_TECHNOLOGY = 'AspNet'
                         }
                     }
 
-                    // Output detected language
+                    if (PROJECT_LANGUAGE == 'Unknown') {
+                        error "Could not detect project language. Please check your repo structure."
+                    }
+
                     echo "Detected Project Language: ${PROJECT_LANGUAGE}"
                 }
             }
         }
+
 
         stage('Run Dependency Scanning Test') {
             steps {
