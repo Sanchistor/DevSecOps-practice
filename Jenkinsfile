@@ -9,6 +9,7 @@ pipeline {
         HELM_RELEASE_NAME = 'asp-release'
         CLUSTER_NAME = 'MYAPP-EKS'
         PROJECT_TECHNOLOGY = 'AspNet'
+        PROJECT_LANGUAGE = ''
 
         //DATABASE CONFIG
         MIGRATIONS_DIR = "Migrations" 
@@ -30,16 +31,20 @@ pipeline {
         stage('Detect Project Language') {
             steps {
                 script {
-                    def projectLanguage = ''
-                    if (fileExists('requirements.txt') || fileExists('setup.py')) {
-                        projectLanguage = 'wagtail'
-                    } else if (fileExists('*.csproj') || fileExists('global.json')) {
-                        projectLanguage = 'aspnet'
-                    } else {
-                        error "Unknown project language, unable to identify!"
+                    PROJECT_LANGUAGE = 'Unknown'
+                    if (fileExists('requirements.txt')) {
+                        PROJECT_LANGUAGE = 'wagtail'
                     }
-                    echo "Detected project language: ${projectLanguage}"
-                    env.PROJECT_LANGUAGE = projectLanguage 
+                    // Check for ASP.NET project files (e.g., .csproj)
+                    else {
+                        def csprojFiles = sh(script: 'find . -name "*.csproj" | head -n 1', returnStdout: true).trim()
+                        if (csprojFiles) {
+                            PROJECT_LANGUAGE = 'aspnet'
+                        }
+                    }
+
+                    // Output detected language
+                    echo "Detected Project Language: ${PROJECT_LANGUAGE}"
                 }
             }
         }
@@ -53,7 +58,7 @@ pipeline {
                     script {
                         // Running snyk test and capturing output for debugging
                             sh """
-                                echo env.PROJECT_LANGUAGE
+                                echo $PROJECT_LANGUAGE
                                 snyk auth $SNYK_TOKEN
                                 snyk test --all-projects --json --debug > snyk-report.json || true
                             """
