@@ -1,29 +1,179 @@
+def IMAGE_TAG = ''
+def KUBE_NAMESPACE = ''
+def HELM_RELEASE_NAME = ''
+def PROJECT_TECHNOLOGY = ''
+
+// ─────────────────────────────
+// Shared Function - Artifact Processor
+// ─────────────────────────────
+def processSecurityArtifact(Map args) {
+    def file = args.file
+    def testType = args.testType
+    def countCommand = args.countCommand
+    def outputPayload = "lambda-${testType.toLowerCase()}-payload.json"
+    def outputResponse = "lambda-${testType.toLowerCase()}-response.json"
+    def projectTechnology = args.projectTechnology
+
+    def vulnCount = sh(script: countCommand, returnStdout: true).trim()
+    echo "[$testType] Vulnerabilities found: $vulnCount"
+
+    archiveArtifacts artifacts: file, fingerprint: true
+
+    sh """
+        jq -c --arg build_number "$BUILD_ID" --arg language "$projectTechnology" '{
+            application_language: \$language,
+            build_number: \$build_number,
+            test_type: "$testType",
+            version: "1.0.0",
+            results: .
+        }' $file > $outputPayload
+    """
+
+    archiveArtifacts artifacts: outputPayload, fingerprint: true
+
+    sh """
+        export AWS_REGION=$AWS_REGION
+        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+        jq . $outputPayload > /dev/null || (echo "Invalid JSON payload!" && exit 1)
+
+        aws lambda invoke \
+            --function-name SaveLogsToCloudWatch \
+            --payload file://$outputPayload \
+            --region $AWS_REGION \
+            --cli-binary-format raw-in-base64-out \
+            $outputResponse
+
+        cat $outputResponse
+
+        aws cloudwatch put-metric-data \
+            --namespace "$projectTechnology" \
+            --metric-name "${testType}_Vulnerabilities" \
+            --value $vulnCount \
+            --unit "Count" \
+            --dimensions "Build=$BUILD_ID" \
+            --region $AWS_REGION
+    """
+}
+
 pipeline {
     agent any
 
     environment {
         AWS_REGION = 'eu-west-1'
         ECR_REPO = '266735847393.dkr.ecr.eu-west-1.amazonaws.com/my-app-ecr'
-        IMAGE_TAG = "wagtail"
-        KUBE_NAMESPACE = 'wagtail'
-        HELM_RELEASE_NAME = 'wagtail-release'
         CLUSTER_NAME = 'MYAPP-EKS'
+        PROJECT_LANGUAGE = ''
+
+        //DATABASE CONFIG
+        MIGRATIONS_DIR = "Migrations" 
+        POSTGRES_DB = credentials('database_name-asp')
+        POSTGRES_USER = credentials('database-user')
+        POSTGRES_PASSWORD = credentials('postgres-password')
+
+        //Security tools creedentials
+        SNYK_TOKEN = credentials('SNYK_TOKEN')
         SAFETY_API_KEY = credentials('safety-api-key')
-        // TARGET_URL = 'http://a8568afcee77646caadc333c1655a122-1516167197.eu-west-1.elb.amazonaws.com/'
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Detect Project Language') {
             steps {
-                git branch: 'wagtail-deployment', url: 'https://github.com/Sanchistor/DevSecOps-practice.git'
+                script {
+                    def csprojFiles = ''
+                    PROJECT_LANGUAGE = 'Unknown'
+
+                    if (fileExists('requirements.txt')) {
+                        PROJECT_LANGUAGE = 'wagtail'
+                        IMAGE_TAG = 'wagtail'
+                        HELM_RELEASE_NAME = 'wagtail-release'
+                        KUBE_NAMESPACE = 'wagtail'
+                        PROJECT_TECHNOLOGY = 'Wagtail'
+                    } else {
+                        csprojFiles = sh(script: 'find . -name "*.csproj" | head -n 1', returnStdout: true).trim()
+                        if (csprojFiles) {
+                            PROJECT_LANGUAGE = 'aspnet'
+                            IMAGE_TAG = 'asp'
+                            HELM_RELEASE_NAME = 'asp-release'
+                            KUBE_NAMESPACE = 'aspnet'
+                            PROJECT_TECHNOLOGY = 'AspNet'
+                        }
+                    }
+
+                    if (PROJECT_LANGUAGE == 'Unknown') {
+                        error "Could not detect project language. Please check your repo structure."
+                    }
+
+                    echo "Detected Project Language: ${PROJECT_LANGUAGE}"
+                }
             }
         }
 
-         stage('Run SAST Scan with Semgrep') {
+
+        stage('Run Dependency Scanning Test') {
             steps {
-                script {
-                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                        sh '''
+                withCredentials([
+                    string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN'),
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
+                ]) {
+                    script {
+                        if (PROJECT_LANGUAGE == 'wagtail') {
+                            sh '''
+                            if ! command -v safety &> /dev/null
+                            then
+                                echo "Installing Safety..."
+                                pip install --user safety
+                            fi
+                            # Ensure ~/.local/bin is in the PATH
+                            export PATH=$HOME/.local/bin:$PATH
+                            export SAFETY_API_KEY=${SAFETY_API_KEY}
+
+                            safety scan -r requirements.txt --output json > safety-report.json || true
+                            '''
+                            archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
+
+                            processSecurityArtifact(
+                                file: 'safety-report.json',
+                                testType: 'DepScan',
+                                countCommand: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json',
+                                projectTechnology: PROJECT_TECHNOLOGY
+                            )
+
+                        } else if (PROJECT_LANGUAGE == 'aspnet') {
+                            // Running snyk test and capturing output for debugging
+                            sh """
+                                snyk auth $SNYK_TOKEN
+                                snyk test --all-projects --json --debug > snyk-report.json || true
+                            """
+                            // Archive the Snyk report for further inspection
+                            archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
+
+                            processSecurityArtifact(
+                                file: 'snyk-report.json',
+                                testType: 'DepScan',
+                                countCommand: 'jq ".vulnerabilities | length" snyk-report.json',
+                                projectTechnology: PROJECT_TECHNOLOGY
+                            )
+
+                        } else if (PROJECT_LANGUAGE == 'nodejs') {
+                            echo "NodeJs Dependecy scanning stage here ..."
+                        }
+
+                        }
+                    }
+                }
+            }
+
+        stage('Run SAST Scan') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN'),
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
+                ]) {
+                    script {
+                        if (PROJECT_LANGUAGE == 'wagtail') {
+                            sh '''
                             # Ensure semgrep is installed if not available
                             if ! command -v semgrep &> /dev/null
                             then
@@ -43,158 +193,69 @@ pipeline {
                             
                         '''
                         archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
-
-                        def vulnerabilityCount = sh(script: 'jq ".results | length" semgrep-report.json', returnStdout: true).trim()
-                        echo "Number of vulnerabilities found: ${vulnerabilityCount}"
-
-                        // Prepare JSON payload for Lambda function
-                        sh '''
-                            jq -c --arg build_number "$BUILD_ID" '{
-                                application_language: "Wagtail",
-                                build_number: $build_number,
-                                test_type: "SAST",
-                                version: "1.114.0",
-                                results: .
-                            }' semgrep-report.json > lambda-semgrep-payload.json
-                        '''
-                        archiveArtifacts artifacts: 'lambda-semgrep-payload.json', fingerprint: true
-
-                        // Invoke Lambda function
-                        sh '''
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            # Ensure the JSON payload is properly formatted
-                            jq . lambda-semgrep-payload.json > /dev/null
-                            if [ $? -ne 0 ]; then
-                                echo "Invalid JSON payload!"
-                                exit 1
-                            fi
-
-                            aws lambda invoke \
-                                --function-name SaveLogsToCloudWatch \
-                                --payload file://lambda-semgrep-payload.json \
-                                --region $AWS_REGION \
-                                --cli-binary-format raw-in-base64-out \
-                                lambda-semgrep-response.json
-
-                            if [ $? -ne 0 ]; then
-                                echo "Lambda invocation failed!"
-                                exit 1
-                            fi
-                            
-
-                            echo "Lambda function invoked. Response:"
-                            cat lambda-semgrep-response.json
-                        '''
-
-                        //Send data to Amazon Cloudwatch
-                        sh """
-                            BUILD_ID=${env.BUILD_ID}
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            aws cloudwatch put-metric-data \
-                                --namespace "Wagtail_Security" \
-                                --metric-name "SAST_Vulnerabilities" \
-                                --value $vulnerabilityCount \
-                                --unit "Count" \
-                                --dimensions "Build=$BUILD_ID" \
-                                --region $AWS_REGION
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('Run Dependency Scanning with Safety') {
-            steps {
-                script {
-                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                        sh '''
-                            if ! command -v safety &> /dev/null
-                            then
-                                echo "Installing Safety..."
-                                pip install --user safety
-                            fi
-                            # Ensure ~/.local/bin is in the PATH
-                            export PATH=$HOME/.local/bin:$PATH
-                            export SAFETY_API_KEY=${SAFETY_API_KEY}
-
-                            safety scan -r requirements.txt --output json > safety-report.json || true
-                        '''
-                        archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
                         
+                        processSecurityArtifact(
+                            file: 'semgrep-report.json',
+                            testType: 'SAST',
+                            countCommand: 'jq ".results | length" semgrep-report.json',
+                            projectTechnology: PROJECT_TECHNOLOGY
+                        )
 
-                        // Fetch the number of vulnerabilities from the safety report
-                        def vulnerabilityCount = sh(script: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json', returnStdout: true).trim()
-                        echo "Number of vulnerabilities found: ${vulnerabilityCount}"
+                        } else if (PROJECT_LANGUAGE == 'aspnet') {
+                            def scannerOutput = sh(
+                            script: '''
+                                export PATH=$PATH:/opt/sonar-scanner/bin
+                                sonar-scanner \
+                                    -Dsonar.projectKey=aspnet-api \
+                                    -Dsonar.projectName="AspNet API" \
+                                    -Dsonar.projectVersion=1.0 \
+                                    -Dsonar.sources=. \
+                                    -Dsonar.exclusions=**/bin/**,**/obj/** \
+                                    -Dsonar.host.url=http://localhost:9000 \
+                                    -Dsonar.login=$SONAR_TOKEN
+                            ''',
+                            returnStdout: true
+                            )
 
-                        // Prepare JSON payload for Lambda function
-                        sh '''
-                            jq -c --arg build_number "$BUILD_ID" '{
-                                application_language: "Wagtail",
-                                build_number: $build_number,
-                                test_type: "DepScan",
-                                version: "1.114.0",
-                                results: .
-                            }' safety-report.json > lambda-safety-payload.json
-                        '''
-                        archiveArtifacts artifacts: 'lambda-safety-payload.json', fingerprint: true
+                            // Extract ceTaskId from report-task.txt
+                            def ceTaskId = sh(
+                                script: "grep 'ceTaskId' .scannerwork/report-task.txt | cut -d'=' -f2",
+                                returnStdout: true
+                            ).trim()
+                            echo "Extracted ceTaskId: ${ceTaskId}"
 
-                        // Invoke Lambda function
-                        sh '''
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            // Wait for background analysis task to complete
+                            timeout(time: 2, unit: 'MINUTES') {
+                                waitUntil {
+                                    def status = sh(script: """
+                                        curl -s -u ${SONAR_TOKEN}: http://localhost:9000/api/ce/task?id=${ceTaskId} | jq -r .task.status
+                                    """, returnStdout: true).trim()
+                                    echo "SonarQube task status: ${status}"
+                                    return (status == "SUCCESS")
+                                }
+                            }
 
-                            # Ensure the JSON payload is properly formatted
-                            jq . lambda-safety-payload.json > /dev/null
-                            if [ $? -ne 0 ]; then
-                                echo "Invalid JSON payload!"
-                                exit 1
-                            fi
+                            // Get real vulnerabilities from SonarQube API
+                            sh '''
+                                curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/issues/search?componentKeys=aspnet-api&types=VULNERABILITY" > sonarqube-report.json
+                            '''
 
-                            aws lambda invoke \
-                                --function-name SaveLogsToCloudWatch \
-                                --payload file://lambda-safety-payload.json \
-                                --region $AWS_REGION \
-                                --cli-binary-format raw-in-base64-out \
-                                lambda-safety-response.json
+                            archiveArtifacts artifacts: 'sonarqube-report.json', fingerprint: true
 
-                            if [ $? -ne 0 ]; then
-                                echo "Lambda invocation failed!"
-                                exit 1
-                            fi
-                            
+                            processSecurityArtifact(
+                                file: 'sonarqube-report.json',
+                                testType: 'SAST',
+                                countCommand: 'jq ".issues | length" sonarqube-report.json',
+                                projectTechnology: PROJECT_TECHNOLOGY
+                            )
 
-                            echo "Lambda function invoked. Response:"
-                            cat lambda-safety-response.json
-                        '''
-
-                        //Send the number of vulnerabilities to CloudWatch
-
-                        sh """
-                            BUILD_ID=${env.BUILD_ID}
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            aws cloudwatch put-metric-data \
-                                --namespace "Wagtail_Security" \
-                                --metric-name "DepScan_Vulnerabilities" \
-                                --value $vulnerabilityCount \
-                                --unit "Count" \
-                                --dimensions "Build=$BUILD_ID" \
-                                --region $AWS_REGION
-                        """
+                        } else if (PROJECT_LANGUAGE == 'nodejs') {
+                            echo "NodeJs SAST scanning stage here ..."
+                        }
                     }
                 }
             }
         }
-
 
          stage('Authenticate to AWS ECR') {
             steps {
@@ -212,6 +273,9 @@ pipeline {
         }
 
         stage('Build and Push Docker Image to ECR') {
+            environment {
+                IMAGE_TAG = "${IMAGE_TAG}"
+            }
             steps {
                 script {
                     sh '''
@@ -222,87 +286,39 @@ pipeline {
             }
         }
 
-        stage('Run Trivy Docker Image Scan') {
+        stage('Run Docker Image Scan') {
+            environment {
+                IMAGE_TAG = "${IMAGE_TAG}"
+            }
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                    // Define Docker image variable using environment variables (or manually set them)
-                    def DOCKER_IMAGE = "${ECR_REPO}:${IMAGE_TAG}"
-                    echo "Running Trivy Scan on Docker image: ${DOCKER_IMAGE}"
+                        // Define Docker image variable using environment variables
+                        def DOCKER_IMAGE = "${ECR_REPO}:${IMAGE_TAG}"
+                        echo "Running Trivy Scan on Docker image: ${DOCKER_IMAGE}"
 
-                    // Run the Trivy scan on the Docker image and output results in JSON format
-                    sh """
-                        trivy image --format json --output trivy-report.json ${DOCKER_IMAGE}
-                    """
-
-                    // Extract vulnerabilities count from the Trivy report using jq
-                    def trivyVulnerabilityCount = sh(script: 'jq "[.Results[].Vulnerabilities | length] | add" trivy-report.json', returnStdout: true).trim()
-                    echo "Number of vulnerabilities found in Docker image: ${trivyVulnerabilityCount}"
-
-                    // Archive Trivy report
-                    archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
-
-                     sh '''
-                            jq -c --arg build_number "$BUILD_ID" '{
-                                application_language: "Wagtail",
-                                build_number: $build_number,
-                                test_type: "ImageScan",
-                                version: "1.114.0",
-                                results: .
-                            }' trivy-report.json > lambda-trivy-payload.json
-                        '''
-                        archiveArtifacts artifacts: 'lambda-trivy-payload.json', fingerprint: true
-
-                        // Invoke Lambda function
-                        sh '''
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            # Ensure the JSON payload is properly formatted
-                            jq . lambda-trivy-payload.json > /dev/null
-                            if [ $? -ne 0 ]; then
-                                echo "Invalid JSON payload!"
-                                exit 1
-                            fi
-
-                            aws lambda invoke \
-                                --function-name SaveLogsToCloudWatch \
-                                --payload file://lambda-trivy-payload.json \
-                                --region $AWS_REGION \
-                                --cli-binary-format raw-in-base64-out \
-                                lambda-trivy-response.json
-
-                            if [ $? -ne 0 ]; then
-                                echo "Lambda invocation failed!"
-                                exit 1
-                            fi
-                            
-
-                            echo "Lambda function invoked. Response:"
-                            cat lambda-trivy-response.json
-                        '''
-
+                        // Run the Trivy scan on the Docker image and output results in JSON format
                         sh """
-                            BUILD_ID=${env.BUILD_ID}
-                            export AWS_REGION=$AWS_REGION
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-                            aws cloudwatch put-metric-data \
-                                --namespace "Wagtail_Security" \
-                                --metric-name "ImageScan_Vulnerabilities" \
-                                --value $trivyVulnerabilityCount \
-                                --unit "Count" \
-                                --dimensions "Build=$BUILD_ID" \
-                                --region $AWS_REGION
+                            trivy image --format json --output trivy-report.json ${DOCKER_IMAGE}
                         """
+                        archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true
+
+                        processSecurityArtifact(
+                            file: 'trivy-report.json',
+                            testType: 'ImageScan',
+                            countCommand: 'jq "[.Results[].Vulnerabilities | length] | add" trivy-report.json',
+                            projectTechnology: PROJECT_TECHNOLOGY
+                        )
                     }
                 }   
             }
         }
 
-        stage('Deploy to EKS using Helm') {
+         stage('Deploy to EKS using Helm') {
+            environment {
+                HELM_RELEASE_NAME = "${HELM_RELEASE_NAME}"
+                KUBE_NAMESPACE = "${KUBE_NAMESPACE}"
+            }
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
@@ -326,6 +342,63 @@ pipeline {
                 }
             }
         }
+
+        stage('Approval Before Applying Migrations') {
+            steps {
+                script {
+                    try {
+                        input message: 'Approve SQL Migrations?', ok: 'Apply Migrations'
+                        // Set the current build description to track approval status
+                        currentBuild.description = 'Migrations Approved'
+                    } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+                        echo "SQL Migrations approval aborted. Skipping migration stages."
+                        currentBuild.description = 'Migrations Not Approved'
+                    }
+                }
+            }
+        }
+
+
+         stage('Fetch RDS Endpoint') {
+            when {
+                expression { return currentBuild.description == 'Migrations Approved' }
+            }
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        RDS_HOST = sh(script: '''
+                            export AWS_REGION=$AWS_REGION
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            aws rds describe-db-instances --query "DBInstances[0].Endpoint.Address" --output text
+                        ''', returnStdout: true).trim()
+
+                        echo "RDS Endpoint: ${RDS_HOST}"
+                    }
+                }
+            }
+        }
+
+        stage('Apply SQL Migrations to RDS') {
+            when {
+                expression { return currentBuild.description == 'Migrations Approved' }
+            }
+            steps {
+                script {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                        sh """
+                            export PGPASSWORD=$POSTGRES_PASSWORD
+                            for sql_file in \$(ls ${MIGRATIONS_DIR}/*.sql); do
+                                echo "Applying migration: \$sql_file"
+                                psql -h ${RDS_HOST} -U ${POSTGRES_USER} -d ${POSTGRES_DB} -f "\$sql_file"
+                            done
+                        """
+                    }
+                }
+            }
+        }
+    }
+
 
         // stage('Run DAST Scan with OWASP ZAP') {
         //     steps {
