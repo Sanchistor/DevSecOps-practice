@@ -123,9 +123,10 @@ def DepScan_scan_Safety(event, apllication_language, build_number, test_type):
     return findings
 
 def DepScan_scan_Snyk(event, apllication_language, build_number, test_type):
+    results = event.get("results", {}).get("vulnerabilities", [])
     findings = []
     # Parsing Snyk results from the event
-    for result in event.get("results", []):
+    for result in results:
         vuln_id = result.get("id", "unknown-id")
         package_name = result.get("packageName", "unknown-package")
         raw_version = result.get("version", "unknown-version")
@@ -244,7 +245,7 @@ def SAST_scan_Semgrep(event, apllication_language, build_number, test_type):
     return findings
 
 def SAST_scan_SonarQube(event, application_language, build_number, test_type):
-    vulnerabilities = event.get("results", [])
+    vulnerabilities = event.get("results", {}).get("issues", [])
     findings = []
 
     for vuln in vulnerabilities:
