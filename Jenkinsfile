@@ -78,7 +78,6 @@ pipeline {
     }
 
     stages {
-
         stage('Detect Project Language') {
             steps {
                 script {
@@ -134,6 +133,13 @@ pipeline {
                             '''
                             archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
 
+                            processSecurityArtifact(
+                                file: 'safety-report.json',
+                                testType: 'DepScan',
+                                countCommand: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json',
+                                projectTechnology: PROJECT_TECHNOLOGY
+                            )
+
                         } else if (PROJECT_LANGUAGE == 'aspnet') {
                             // Running snyk test and capturing output for debugging
                             sh """
@@ -158,7 +164,6 @@ pipeline {
                     }
                 }
             }
-        
 
         stage('Run SAST Scan') {
             steps {
@@ -188,6 +193,13 @@ pipeline {
                             
                         '''
                         archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
+                        
+                        processSecurityArtifact(
+                            file: 'semgrep-report.json',
+                            testType: 'SAST',
+                            countCommand: 'jq ".results | length" semgrep-report.json',
+                            projectTechnology: PROJECT_TECHNOLOGY
+                        )
 
                         } else if (PROJECT_LANGUAGE == 'aspnet') {
                             def scannerOutput = sh(
@@ -245,7 +257,6 @@ pipeline {
             }
         }
 
-
          stage('Authenticate to AWS ECR') {
             steps {
                 script {
@@ -275,14 +286,14 @@ pipeline {
             }
         }
 
-         stage('Run Docker Image Scan') {
+        stage('Run Docker Image Scan') {
             environment {
                 IMAGE_TAG = "${IMAGE_TAG}"
             }
             steps {
                 script {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                        // Define Docker image variable using environment variables (or manually set them)
+                        // Define Docker image variable using environment variables
                         def DOCKER_IMAGE = "${ECR_REPO}:${IMAGE_TAG}"
                         echo "Running Trivy Scan on Docker image: ${DOCKER_IMAGE}"
 
@@ -331,7 +342,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('Approval Before Applying Migrations') {
             steps {
@@ -388,8 +398,6 @@ pipeline {
             }
         }
     }
-
-        
 
     post {
         success {
