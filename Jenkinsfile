@@ -111,151 +111,151 @@ pipeline {
         }
 
 
-        stage('Run Dependency Scanning Test') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN'),
-                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
-                ]) {
-                    script {
-                        if (PROJECT_LANGUAGE == 'wagtail') {
-                            sh '''
-                            if ! command -v safety &> /dev/null
-                            then
-                                echo "Installing Safety..."
-                                pip install --user safety
-                            fi
-                            # Ensure ~/.local/bin is in the PATH
-                            export PATH=$HOME/.local/bin:$PATH
-                            export SAFETY_API_KEY=${SAFETY_API_KEY}
+        // stage('Run Dependency Scanning Test') {
+        //     steps {
+        //         withCredentials([
+        //             string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN'),
+        //             [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
+        //         ]) {
+        //             script {
+        //                 if (PROJECT_LANGUAGE == 'wagtail') {
+        //                     sh '''
+        //                     if ! command -v safety &> /dev/null
+        //                     then
+        //                         echo "Installing Safety..."
+        //                         pip install --user safety
+        //                     fi
+        //                     # Ensure ~/.local/bin is in the PATH
+        //                     export PATH=$HOME/.local/bin:$PATH
+        //                     export SAFETY_API_KEY=${SAFETY_API_KEY}
 
-                            safety scan -r requirements.txt --output json > safety-report.json || true
-                            '''
-                            archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
+        //                     safety scan -r requirements.txt --output json > safety-report.json || true
+        //                     '''
+        //                     archiveArtifacts artifacts: 'safety-report.json', allowEmptyArchive: true
 
-                            processSecurityArtifact(
-                                file: 'safety-report.json',
-                                testType: 'DepScan',
-                                countCommand: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json',
-                                projectTechnology: PROJECT_TECHNOLOGY
-                            )
+        //                     processSecurityArtifact(
+        //                         file: 'safety-report.json',
+        //                         testType: 'DepScan',
+        //                         countCommand: 'jq "[.scan_results.projects[].files[].results.dependencies[].specifications[].vulnerabilities.known_vulnerabilities[]] | length" safety-report.json',
+        //                         projectTechnology: PROJECT_TECHNOLOGY
+        //                     )
 
-                        } else if (PROJECT_LANGUAGE == 'aspnet') {
-                            // Running snyk test and capturing output for debugging
-                            sh """
-                                snyk auth $SNYK_TOKEN
-                                snyk test --all-projects --json --debug > snyk-report.json || true
-                            """
-                            // Archive the Snyk report for further inspection
-                            archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
+        //                 } else if (PROJECT_LANGUAGE == 'aspnet') {
+        //                     // Running snyk test and capturing output for debugging
+        //                     sh """
+        //                         snyk auth $SNYK_TOKEN
+        //                         snyk test --all-projects --json --debug > snyk-report.json || true
+        //                     """
+        //                     // Archive the Snyk report for further inspection
+        //                     archiveArtifacts artifacts: 'snyk-report.json', fingerprint: true
 
-                            processSecurityArtifact(
-                                file: 'snyk-report.json',
-                                testType: 'DepScan',
-                                countCommand: 'jq ".vulnerabilities | length" snyk-report.json',
-                                projectTechnology: PROJECT_TECHNOLOGY
-                            )
+        //                     processSecurityArtifact(
+        //                         file: 'snyk-report.json',
+        //                         testType: 'DepScan',
+        //                         countCommand: 'jq ".vulnerabilities | length" snyk-report.json',
+        //                         projectTechnology: PROJECT_TECHNOLOGY
+        //                     )
 
-                        } else if (PROJECT_LANGUAGE == 'nodejs') {
-                            echo "NodeJs Dependecy scanning stage here ..."
-                        }
+        //                 } else if (PROJECT_LANGUAGE == 'nodejs') {
+        //                     echo "NodeJs Dependecy scanning stage here ..."
+        //                 }
 
-                        }
-                    }
-                }
-            }
+        //                 }
+        //             }
+        //         }
+        //     }
 
-        stage('Run SAST Scan') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN'),
-                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
-                ]) {
-                    script {
-                        if (PROJECT_LANGUAGE == 'wagtail') {
-                            sh '''
-                            # Ensure semgrep is installed if not available
-                            if ! command -v semgrep &> /dev/null
-                            then
-                                echo "semgrep not found, installing..."
-                                pip install --user semgrep
-                            fi
+        // stage('Run SAST Scan') {
+        //     steps {
+        //         withCredentials([
+        //             string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN'),
+        //             [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']
+        //         ]) {
+        //             script {
+        //                 if (PROJECT_LANGUAGE == 'wagtail') {
+        //                     sh '''
+        //                     # Ensure semgrep is installed if not available
+        //                     if ! command -v semgrep &> /dev/null
+        //                     then
+        //                         echo "semgrep not found, installing..."
+        //                         pip install --user semgrep
+        //                     fi
 
-                            # Ensure ~/.local/bin is in the PATH
-                            export PATH=$HOME/.local/bin:$PATH
+        //                     # Ensure ~/.local/bin is in the PATH
+        //                     export PATH=$HOME/.local/bin:$PATH
 
-                            # Verify that semgrep is accessible
-                            echo "Checking semgrep version..."
-                            semgrep --version
+        //                     # Verify that semgrep is accessible
+        //                     echo "Checking semgrep version..."
+        //                     semgrep --version
 
-                            # Run semgrep scan
-                            semgrep scan --config auto --severity INFO --severity WARNING --severity ERROR --json > semgrep-report.json || true
+        //                     # Run semgrep scan
+        //                     semgrep scan --config auto --severity INFO --severity WARNING --severity ERROR --json > semgrep-report.json || true
                             
-                        '''
-                        archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
+        //                 '''
+        //                 archiveArtifacts artifacts: 'semgrep-report.json', fingerprint: true
                         
-                        processSecurityArtifact(
-                            file: 'semgrep-report.json',
-                            testType: 'SAST',
-                            countCommand: 'jq ".results | length" semgrep-report.json',
-                            projectTechnology: PROJECT_TECHNOLOGY
-                        )
+        //                 processSecurityArtifact(
+        //                     file: 'semgrep-report.json',
+        //                     testType: 'SAST',
+        //                     countCommand: 'jq ".results | length" semgrep-report.json',
+        //                     projectTechnology: PROJECT_TECHNOLOGY
+        //                 )
 
-                        } else if (PROJECT_LANGUAGE == 'aspnet') {
-                            def scannerOutput = sh(
-                            script: '''
-                                export PATH=$PATH:/opt/sonar-scanner/bin
-                                sonar-scanner \
-                                    -Dsonar.projectKey=aspnet-api \
-                                    -Dsonar.projectName="AspNet API" \
-                                    -Dsonar.projectVersion=1.0 \
-                                    -Dsonar.sources=. \
-                                    -Dsonar.exclusions=**/bin/**,**/obj/** \
-                                    -Dsonar.host.url=http://localhost:9000 \
-                                    -Dsonar.login=$SONAR_TOKEN
-                            ''',
-                            returnStdout: true
-                            )
+        //                 } else if (PROJECT_LANGUAGE == 'aspnet') {
+        //                     def scannerOutput = sh(
+        //                     script: '''
+        //                         export PATH=$PATH:/opt/sonar-scanner/bin
+        //                         sonar-scanner \
+        //                             -Dsonar.projectKey=aspnet-api \
+        //                             -Dsonar.projectName="AspNet API" \
+        //                             -Dsonar.projectVersion=1.0 \
+        //                             -Dsonar.sources=. \
+        //                             -Dsonar.exclusions=**/bin/**,**/obj/** \
+        //                             -Dsonar.host.url=http://localhost:9000 \
+        //                             -Dsonar.login=$SONAR_TOKEN
+        //                     ''',
+        //                     returnStdout: true
+        //                     )
 
-                            // Extract ceTaskId from report-task.txt
-                            def ceTaskId = sh(
-                                script: "grep 'ceTaskId' .scannerwork/report-task.txt | cut -d'=' -f2",
-                                returnStdout: true
-                            ).trim()
-                            echo "Extracted ceTaskId: ${ceTaskId}"
+        //                     // Extract ceTaskId from report-task.txt
+        //                     def ceTaskId = sh(
+        //                         script: "grep 'ceTaskId' .scannerwork/report-task.txt | cut -d'=' -f2",
+        //                         returnStdout: true
+        //                     ).trim()
+        //                     echo "Extracted ceTaskId: ${ceTaskId}"
 
-                            // Wait for background analysis task to complete
-                            timeout(time: 2, unit: 'MINUTES') {
-                                waitUntil {
-                                    def status = sh(script: """
-                                        curl -s -u ${SONAR_TOKEN}: http://localhost:9000/api/ce/task?id=${ceTaskId} | jq -r .task.status
-                                    """, returnStdout: true).trim()
-                                    echo "SonarQube task status: ${status}"
-                                    return (status == "SUCCESS")
-                                }
-                            }
+        //                     // Wait for background analysis task to complete
+        //                     timeout(time: 2, unit: 'MINUTES') {
+        //                         waitUntil {
+        //                             def status = sh(script: """
+        //                                 curl -s -u ${SONAR_TOKEN}: http://localhost:9000/api/ce/task?id=${ceTaskId} | jq -r .task.status
+        //                             """, returnStdout: true).trim()
+        //                             echo "SonarQube task status: ${status}"
+        //                             return (status == "SUCCESS")
+        //                         }
+        //                     }
 
-                            // Get real vulnerabilities from SonarQube API
-                            sh '''
-                                curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/issues/search?componentKeys=aspnet-api&types=VULNERABILITY" > sonarqube-report.json
-                            '''
+        //                     // Get real vulnerabilities from SonarQube API
+        //                     sh '''
+        //                         curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/issues/search?componentKeys=aspnet-api&types=VULNERABILITY" > sonarqube-report.json
+        //                     '''
 
-                            archiveArtifacts artifacts: 'sonarqube-report.json', fingerprint: true
+        //                     archiveArtifacts artifacts: 'sonarqube-report.json', fingerprint: true
 
-                            processSecurityArtifact(
-                                file: 'sonarqube-report.json',
-                                testType: 'SAST',
-                                countCommand: 'jq ".issues | length" sonarqube-report.json',
-                                projectTechnology: PROJECT_TECHNOLOGY
-                            )
+        //                     processSecurityArtifact(
+        //                         file: 'sonarqube-report.json',
+        //                         testType: 'SAST',
+        //                         countCommand: 'jq ".issues | length" sonarqube-report.json',
+        //                         projectTechnology: PROJECT_TECHNOLOGY
+        //                     )
 
-                        } else if (PROJECT_LANGUAGE == 'nodejs') {
-                            echo "NodeJs SAST scanning stage here ..."
-                        }
-                    }
-                }
-            }
-        }
+        //                 } else if (PROJECT_LANGUAGE == 'nodejs') {
+        //                     echo "NodeJs SAST scanning stage here ..."
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
          stage('Authenticate to AWS ECR') {
             steps {
