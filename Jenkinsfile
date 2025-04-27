@@ -152,9 +152,9 @@ pipeline {
                             helm repo update
 
                             #Install ingress-nginx on K8S cluster
-                            helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-                               --namespace ingress-nginx \
-                               --set controller.service.type=LoadBalancer
+                            #helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+                            #   --namespace ingress-nginx \
+                            #   --set controller.service.type=LoadBalancer
 
                             #------------------------------------
                             # Install cert-manager
